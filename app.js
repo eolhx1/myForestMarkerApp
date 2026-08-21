@@ -136,9 +136,12 @@ document.getElementById('btn-mark').addEventListener('click', () => {
 // Knapp: Centrera kartan på din nuvarande position
 document.getElementById('btn-recenter').addEventListener('click', () => {
   if (currentCoords) {
-    map.setView(currentCoords, 16);
+    // map.setView flyttar kartan till dina koordinater med zoom-nivå 16
+    // Om du vill ha en mjukare animering kan du byta ut setView mot flyTo
+    map.setView(currentCoords, 16); 
   } else {
-    alert("Kunde inte hitta din nuvarande position.");
+    // Om GPS:en inte har hittat position än
+    alert("Väntar på att hitta din GPS-position...");
   }
 });
 
