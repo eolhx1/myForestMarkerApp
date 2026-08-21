@@ -1,7 +1,9 @@
 {
+  "id": "/myForestMarkerApp/",
   "name": "Skogsmarkören",
   "short_name": "Skogsmarkör",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#059669",
@@ -9,7 +11,14 @@
     {
       "src": "https://cdn-icons-png.flaticon.com/512/3592/3592862.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3592/3592862.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
