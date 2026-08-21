@@ -58,9 +58,10 @@
       <button id="btn-map" class="flex-1 py-2 px-3 bg-white rounded-xl shadow-sm text-emerald-800 flex items-center justify-center gap-1">
         🗺️ Karta & Topo
       </button>
-      <button id="btn-list" class="flex-1 py-2 px-3 text-slate-600 flex items-center justify-center gap-1">
-        📋 Lista (4)
-      </button>
+<button id="btn-list" class="flex-1 py-2 px-3 text-slate-600 flex items-center justify-center gap-1">
+  📋 Lista (<span id="marker-count">1</span>)
+</button>
+
     </div>
     <button id="btn-mark" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-3 px-4 rounded-2xl shadow flex items-center gap-1.5">
       📍 Markera min position
@@ -88,10 +89,17 @@
 
     <!-- Map Overlay Bottom (Här ska footern ligga!) -->
     <div class="absolute bottom-4 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-medium text-slate-700 flex items-center gap-2 border border-slate-200">
-      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <strong>4 platser</strong> på kartan</span>
+<span class="flex items-center gap-1">
+  <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 
+  <strong><span id="marker-count">1</span> platser</strong> på kartan
+</span>
+
       <span class="text-slate-300">|</span>
       <span id="gps-accuracy-footer">GPS: Söker...</span>
     </div>
+
+
+    
   </div>
 
   <script src="app.js"></script>

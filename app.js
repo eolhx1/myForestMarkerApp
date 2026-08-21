@@ -10,7 +10,7 @@ L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
 // Zoom-kontroller nere till höger
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Anpassad ikon för sparade svampställen / platser (som i bilden)
+// Anpassad ikon för sparade svampställen / platser
 const mushroomIcon = L.divIcon({
   className: 'custom-marker',
   html: `
@@ -21,7 +21,7 @@ const mushroomIcon = L.divIcon({
   `,
   iconSize: [36, 36],
   iconAnchor: [18, 36],
-  popupAnchor: [0, -36] // Se till att popupen öppnas ovanför ikonen
+  popupAnchor: [0, -36]
 });
 
 // Anpassad stil för min aktuella GPS-position (blå pulserande prick)
@@ -37,7 +37,7 @@ const myLocationIcon = L.divIcon({
   iconAnchor: [11, 11]
 });
 
-// CSS-animering för den pulserande blå pricken
+// CSS-animering och anpassning för Leaflet popup
 const styleSheet = document.createElement("style");
 styleSheet.innerText = `
   @keyframes ping {
@@ -46,35 +46,56 @@ styleSheet.innerText = `
       opacity: 0;
     }
   }
-  /* Tailwind klasser för Leaflet popup-container för att efterlikna bilden */
   .leaflet-popup-content-wrapper {
     padding: 0;
-    border-radius: 1rem; /* rounded-2xl */
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+    border-radius: 1rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   }
   .leaflet-popup-content {
     margin: 0;
-    width: auto !important; /* Låt Tailwind sköta bredden */
+    width: auto !important;
   }
 `;
 document.head.appendChild(styleSheet);
 
-// Funktion för att skapa HTML-innehållet till popupen baserat på platsdata
-function createPopupContent(place) {
-  // Koordinater för Google Maps/Earth-länkar
+// Global matris för att hålla reda på aktiva markörer på kartan
+let savedMarkers = [];
+
+// Funktion för att ta bort en markör både från kartan och minnet
+function deleteMarker(placeId, marker) {
+  if (confirm("Vill du ta bort denna markör?")) {
+    map.removeLayer(marker); // Ta bort från Leaflet-kartan
+    savedMarkers = savedMarkers.filter(m => m !== marker); // Ta bort från matrisen
+    updateMarkerCount(); // Uppdatera räknaren i gränssnittet
+  }
+}
+
+// Funktion för att uppdatera platser-räknaren i gränssnittet
+function updateMarkerCount() {
+  const countElements = document.querySelectorAll('#marker-count');
+  countElements.forEach(el => {
+    el.innerText = savedMarkers.length;
+  });
+}
+
+// Funktion för att skapa HTML-innehållet till popupen
+function createPopupContent(place, placeId) {
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
   const googleEarthUrl = `https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r`;
 
   return `
     <div class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200" style="width: 280px; max-width: calc(100vw - 40px);">
-      <!-- Rubrik och stäng-kryss (Stäng-krysset sköts av Leaflet, men vi efterliknar layouten) -->
-      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="font-bold text-lg text-emerald-900 leading-tight">${place.title}</h3>
+      <!-- Rubrik & Papperskorgsknapp -->
+      <div class="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="font-bold text-base text-emerald-900 leading-tight pr-2">${place.title}</h3>
+        <button onclick="window.removeCurrentMarker('${placeId}')" title="Ta bort plats" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center">
+          🗑️
+        </button>
       </div>
 
       <!-- Taggar och distans -->
-      <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold">
-        <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">${place.category}</span>
+      <div class="px-3 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold">
+        <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">${place.category}</span>
         <span class="text-slate-500">• ${place.distance} bort (${place.bearing})</span>
       </div>
 
@@ -84,14 +105,14 @@ function createPopupContent(place) {
       </div>
 
       <!-- Beskrivning -->
-      <div class="px-4 py-2 text-sm text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
+      <div class="px-3 py-1.5 text-xs text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
         <span class="not-italic">"</span>${place.description}<span class="not-italic">"</span>
       </div>
 
       <!-- Detaljer -->
-      <div class="p-4 space-y-2 text-sm text-slate-700">
+      <div class="p-3 space-y-1.5 text-xs text-slate-700">
         <div class="flex items-center gap-1.5 text-blue-700">
-          📍 <span class="font-mono text-slate-600 text-xs">${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}</span>
+          📍 <span class="font-mono text-slate-600">${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}</span>
         </div>
         <div class="flex items-center gap-1.5 text-emerald-700">
           ⛰️ <strong>Höjd:</strong> <span class="text-slate-600">${place.altitude} m.ö.h</span>
@@ -102,11 +123,11 @@ function createPopupContent(place) {
       </div>
 
       <!-- Externa knappar -->
-      <div class="p-3 bg-slate-100 border-t border-slate-200 flex items-center justify-center gap-3">
-        <a href="${googleEarthUrl}" target="_blank" class="flex-1 inline-flex items-center justify-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-xl text-xs font-semibold shadow-sm hover:bg-blue-100 transition">
+      <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex items-center justify-center gap-2">
+        <a href="${googleEarthUrl}" target="_blank" class="flex-1 inline-flex items-center justify-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-sm hover:bg-blue-100 transition">
           🌐 Earth 3D
         </a>
-        <a href="${googleMapsUrl}" target="_blank" class="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-2 rounded-xl text-xs font-semibold shadow-sm hover:bg-emerald-100 transition">
+        <a href="${googleMapsUrl}" target="_blank" class="flex-1 inline-flex items-center justify-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-sm hover:bg-emerald-100 transition">
           🗺️ Maps
         </a>
       </div>
@@ -114,45 +135,59 @@ function createPopupContent(place) {
   `;
 }
 
-// Variabler för min GPS-position och osäkerhetscirkel
-let userPositionMarker = null;
-let userAccuracyCircle = null;
-let currentCoords = null;
-let savedMarkers = [];
+// Koppling så att knappen inuti HTML-popupen kan anropa JavaScript-funktionen
+const markerMap = new Map();
+window.removeCurrentMarker = function(placeId) {
+  const marker = markerMap.get(placeId);
+  if (marker) {
+    deleteMarker(placeId, marker);
+    markerMap.delete(placeId);
+  }
+};
 
-// Uppdaterade exempel på sparade platser med mer data för popupen
+// Hjälpfunktion för att lägga till ny plats på kartan
+function addPlaceToMap(place) {
+  const placeId = 'marker_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+  const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
+  
+  markerMap.set(placeId, marker);
+  
+  const popupContent = createPopupContent(place, placeId);
+  marker.bindPopup(popupContent);
+  
+  savedMarkers.push(marker);
+  updateMarkerCount();
+  return marker;
+}
+
+// Exempel på startplatser
 const savedPlaces = [
   { 
     lat: 59.3293, 
     lng: 18.0686, 
     title: "Kantarelldrag i mossig sluttning", 
     category: "Gula kantareller",
-    distance: "330.2 km",
-    bearing: "ONO",
+    distance: "0 km",
+    bearing: "Här",
     description: "Växer längs gammal granstubbe och mjuk fuktig mossa. Plockade 2 liter.",
-    imageUrl: "https://images.unsplash.com/photo-1632731881691-645b2069b917?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMTkyMXwwfDF8c2VhcmNofDExfHxtdXNocm9vbXMlMjBmb3Jlc3R8ZW58MHx8fHwxNjMyNzM4ODY2&ixlib=rb-1.2.1&q=80&w=400", // En placeholder-bild
+    imageUrl: "https://images.unsplash.com/photo-1632731881691-645b2069b917?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMTkyMXwwfDF8c2VhcmNofDExfHxtdXNocm9vbXMlMjBmb3Jlc3R8ZW58MHx8fHwxNjMyNzM4ODY2&ixlib=rb-1.2.1&q=80&w=400",
     altitude: 42,
     timestamp: "2026-08-19"
   }
 ];
 
-// Lägg till de sparade platserna på kartan och bind popupen
-savedPlaces.forEach(place => {
-  const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
-  
-  // Skapa popup-innehållet och bind det till markören
-  const popupContent = createPopupContent(place);
-  marker.bindPopup(popupContent);
-  
-  savedMarkers.push(marker);
-});
+// Lägg till startplatserna
+savedPlaces.forEach(place => addPlaceToMap(place));
 
-// Funktion för att uppdatera eller skapa GPS-markören och noggrannhetscirkeln
+// GPS-funktioner
+let userPositionMarker = null;
+let userAccuracyCircle = null;
+let currentCoords = null;
+
 function updatePosition(position, autoCenter = false) {
   const { latitude, longitude, accuracy } = position.coords;
   currentCoords = [latitude, longitude];
 
-  // Uppdatera noggrannhetstexten i gränssnittet
   const accuracyText = `±${Math.round(accuracy)}m`;
   const accuracyBadge = document.getElementById('gps-accuracy-badge');
   const accuracyFooter = document.getElementById('gps-accuracy-footer');
@@ -160,25 +195,22 @@ function updatePosition(position, autoCenter = false) {
   if (accuracyBadge) accuracyBadge.innerText = accuracyText;
   if (accuracyFooter) accuracyFooter.innerText = `GPS: ${accuracyText}`;
 
-  // Om markörerna redan finns, uppdatera deras positioner
   if (userPositionMarker && userAccuracyCircle) {
     userPositionMarker.setLatLng([latitude, longitude]);
     userAccuracyCircle.setLatLng([latitude, longitude]);
-    userAccuracyCircle.setRadius(accuracy); // Sätt radien i meter
+    userAccuracyCircle.setRadius(accuracy);
   } else {
-    // Skapa osäkerhetscirkeln (blå genomskinlig radie)
     userAccuracyCircle = L.circle([latitude, longitude], {
-      radius: accuracy, // Radie i meter från GPS
+      radius: accuracy,
       color: '#3b82f6',
       weight: 1,
       fillColor: '#3b82f6',
       fillOpacity: 0.15
     }).addTo(map);
 
-    // Skapa den blå positionspricken
     userPositionMarker = L.marker([latitude, longitude], { 
       icon: myLocationIcon,
-      zIndexOffset: 1000 // Se till att din position ligger överst
+      zIndexOffset: 1000
     }).addTo(map);
   }
 
@@ -187,51 +219,37 @@ function updatePosition(position, autoCenter = false) {
   }
 }
 
-// Starta kontinuerlig GPS-spårning (watchPosition)
 if ('geolocation' in navigator) {
   let initialCenterDone = false;
   
   navigator.geolocation.watchPosition(
     (position) => {
-      // Första gången positionen hittas centrerar vi kartan
       updatePosition(position, !initialCenterDone);
       initialCenterDone = true;
     },
-    (error) => {
-      console.warn("GPS-fel:", error.message);
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 2000
-    }
+    (error) => console.warn("GPS-fel:", error.message),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
   );
-} else {
-  alert("GPS stöds inte i din webbläsare.");
 }
 
-// Knapp: "Markera min position" (Skapar en svampmarkör där du står)
+// Knapp: "Markera min position"
 document.getElementById('btn-mark').addEventListener('click', () => {
   if (currentCoords) {
-    // Eftersom vi väntar med permanent lagring skapar vi en platsprofil med dummy-data
-    const newPlaceData = {
+    const newPlace = {
       lat: currentCoords[0],
       lng: currentCoords[1],
-      title: "Ny markering (Ej sparad permanent)",
-      category: "Okänd svamp",
+      title: "Ny markering",
+      category: "Svampställe",
       distance: "0 km",
-      bearing: "-",
-      description: "Här hittade jag någonting nytt! Beskrivning saknas.",
+      bearing: "Här",
+      description: "Ny tillagd markering på din nuvarande position.",
       imageUrl: "https://images.unsplash.com/photo-1632731881691-645b2069b917?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMTkyMXwwfDF8c2VhcmNofDExfHxtdXNocm9vbXMlMjBmb3Jlc3R8ZW58MHx8fHwxNjMyNzM4ODY2&ixlib=rb-1.2.1&q=80&w=400",
       altitude: 0,
       timestamp: new Date().toISOString().split('T')[0]
     };
 
-    const newMarker = L.marker(currentCoords, { icon: mushroomIcon }).addTo(map);
-    const popupContent = createPopupContent(newPlaceData);
-    newMarker.bindPopup(popupContent).openPopup(); // Öppna popupen direkt
-    
-    savedMarkers.push(newMarker);
+    const marker = addPlaceToMap(newPlace);
+    marker.openPopup();
   } else {
     alert("Väntar på din GPS-position...");
   }
@@ -240,13 +258,13 @@ document.getElementById('btn-mark').addEventListener('click', () => {
 // Knapp: Centrera kartan på din nuvarande position
 document.getElementById('btn-recenter').addEventListener('click', () => {
   if (currentCoords) {
-    map.setView(currentCoords, 16);
+    map.flyTo(currentCoords, 16, { animate: true });
   } else {
     alert("Kunde inte hitta din nuvarande position.");
   }
 });
 
-// Registrera Service Worker för PWA
+// Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log('SW Registration failed:', err));
 }
