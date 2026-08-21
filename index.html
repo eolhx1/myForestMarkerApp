@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Skogsmarkören</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#059669">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    #map { height: calc(100vh - 160px); width: 100%; }
+    .custom-marker {
+      background: #eab308;
+      border: 3px solid white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
+
+  <!-- Header -->
+  <header class="p-3 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-2">
+      <div class="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-xl shadow">
+        🍄
+      </div>
+      <div>
+        <h1 class="font-bold text-lg leading-tight">Skogsmarkören</h1>
+        <p class="text-xs text-slate-500">GPS • Google Sheets & Earth</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="inline-flex items-center gap-1 text-xs bg-slate-100 px-2.5 py-1.5 rounded-full border border-slate-200 font-medium text-slate-600">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> ±3m 🔄
+      </span>
+      <button class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-full font-semibold">
+        🌐 Earth
+      </button>
+    </div>
+  </header>
+
+  <!-- Controls -->
+  <div class="p-2 bg-slate-100 flex items-center gap-2">
+    <div class="flex bg-slate-200/80 p-1 rounded-2xl flex-1 text-xs font-semibold">
+      <button id="btn-map" class="flex-1 py-2 px-3 bg-white rounded-xl shadow-sm text-emerald-800 flex items-center justify-center gap-1">
+        🗺️ Karta & Topo
+      </button>
+      <button id="btn-list" class="flex-1 py-2 px-3 text-slate-600 flex items-center justify-center gap-1">
+        📋 Lista (4)
+      </button>
+    </div>
+    <button id="btn-mark" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-3 px-4 rounded-2xl shadow flex items-center gap-1.5">
+      📍 Markera min position
+    </button>
+  </div>
+
+  <!-- Map Container -->
+  <div class="relative flex-1">
+    <div id="map" class="z-0"></div>
+
+    <!-- Map Overlays Top -->
+    <div class="absolute top-3 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-bold flex items-center gap-1.5 border border-slate-200">
+      🥞 🌲 Skogstopo
+    </div>
+
+    <!-- Map Floating Buttons Right -->
+    <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
+      <button id="btn-recenter" class="w-10 h-10 bg-white rounded-2xl shadow flex items-center justify-center text-blue-600 border border-slate-200 font-bold text-lg">
+        🎯
+      </button>
+      <button class="w-10 h-10 bg-white rounded-2xl shadow flex items-center justify-center text-emerald-600 border border-slate-200 font-bold text-lg">
+        🌐
+      </button>
+    </div>
+
+    <!-- Map Overlay Bottom -->
+    <div class="absolute bottom-4 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-medium text-slate-700 flex items-center gap-2 border border-slate-200">
+      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <strong>4 platser</strong> på kartan</span>
+      <span class="text-slate-300">|</span>
+      <span>GPS: ±3m</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
