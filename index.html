@@ -31,6 +31,12 @@
 
   <!-- Header -->
   <header class="p-3 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm">
+    <!-- GPS Badge i headern -->
+    <span class="inline-flex items-center gap-1 text-xs bg-slate-100 px-2.5 py-1.5 rounded-full border border-slate-200 font-medium text-slate-600">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 
+      <span id="gps-accuracy-badge">Söker GPS...</span> 🔄
+    </span>
+      
     <div class="flex items-center gap-2">
       <div class="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-xl shadow">
         🍄
@@ -40,14 +46,10 @@
         <p class="text-xs text-slate-500">GPS • Google Sheets & Earth</p>
       </div>
     </div>
-    <div class="flex items-center gap-2">
-      <span class="inline-flex items-center gap-1 text-xs bg-slate-100 px-2.5 py-1.5 rounded-full border border-slate-200 font-medium text-slate-600">
-        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> ±3m 🔄
-      </span>
-      <button class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-full font-semibold">
-        🌐 Earth
-      </button>
-    </div>
+
+    <button class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-full font-semibold">
+      🌐 Earth
+    </button>
   </header>
 
   <!-- Controls -->
@@ -84,11 +86,11 @@
       </button>
     </div>
 
-    <!-- Map Overlay Bottom -->
+    <!-- Map Overlay Bottom (Här ska footern ligga!) -->
     <div class="absolute bottom-4 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-medium text-slate-700 flex items-center gap-2 border border-slate-200">
       <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <strong>4 platser</strong> på kartan</span>
       <span class="text-slate-300">|</span>
-      <span>GPS: ±3m</span>
+      <span id="gps-accuracy-footer">GPS: Söker...</span>
     </div>
   </div>
 
