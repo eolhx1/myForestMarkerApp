@@ -495,3 +495,166 @@ if (btnMap) {
     setTimeout(() => map.invalidateSize(), 100);
   });
 }
+
+// -----------------------------------------------------------------
+// IndexedDB Databashantering (Offline-first)
+// -----------------------------------------------------------------
+const DB_NAME = 'SkogsmarkorenDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'places';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function savePlaceLocally(place) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(place);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function getLocalPlaces() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function deletePlaceLocally(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+
+
+// Spara plats (Lokalt först, sen Sheets om online)
+document.getElementById('btn-save-confirm').addEventListener('click', async () => {
+  const title = document.getElementById('input-title').value || selectedCategory.name;
+  const notes = document.getElementById('input-notes').value || 'Inga anteckningar angivna.';
+
+  const newPlace = {
+    id: 'marker_' + Date.now(),
+    lat: currentCoords[0],
+    lng: currentCoords[1],
+    title: title,
+    category: selectedCategory.name,
+    description: `${selectedAmount}. ${notes}`,
+    timestamp: new Date().toISOString().split('T')[0],
+    synced: false
+  };
+
+  // 1. Spara lokalt i IndexedDB direkt
+  await savePlaceLocally(newPlace);
+  
+  // 2. Visa på kartan och i listan
+  const marker = addPlaceToMap(newPlace);
+  modal.classList.add('hidden');
+  marker.openPopup();
+
+  // 3. Försök synka till Google Sheets
+  if (navigator.onLine) {
+    syncPlaceToSheets(newPlace);
+  }
+});
+
+async function syncPlaceToSheets(placeData) {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(placeData)
+    });
+    
+    // Markera som synkad lokalt
+    placeData.synced = true;
+    await savePlaceLocally(placeData);
+    console.log("Synkad till Google Sheets:", placeData.id);
+  } catch (err) {
+    console.warn("Kunde inte synka till Sheets just nu (Sparad offline):", err);
+  }
+}
+
+// Ta bort plats lokalt och från Sheets
+window.removeCurrentMarker = async function(placeId) {
+  const marker = markerMap.get(placeId);
+  if (marker && confirm("Vill du ta bort denna markör?")) {
+    map.removeLayer(marker);
+    savedPlaces = savedPlaces.filter(p => String(p.id) !== String(placeId));
+    markerMap.delete(placeId);
+    
+    // Ta bort lokalt från IndexedDB
+    await deletePlaceLocally(placeId);
+    
+    updateMarkerCount();
+    renderListView();
+
+    // Om online, skicka borttagning till Sheets
+    if (navigator.onLine) {
+      deleteFromGoogleSheets(placeId);
+    }
+  }
+};
+
+
+async function initAppStorage() {
+  // Ladda från IndexedDB först (Funkar utan täckning)
+  const localPlaces = await getLocalPlaces();
+  localPlaces.forEach(place => addPlaceToMap(place));
+
+  // Om vi har internet, hämta eventuella nya rader från Google Sheets
+  if (navigator.onLine) {
+    try {
+      const response = await fetch(SCRIPT_URL);
+      const remotePlaces = await response.json();
+      
+      for (const rPlace of remotePlaces) {
+        if (!savedPlaces.some(p => String(p.id) === String(rPlace.id))) {
+          rPlace.synced = true;
+          await savePlaceLocally(rPlace);
+          addPlaceToMap(rPlace);
+        }
+      }
+    } catch (err) {
+      console.log("Körs i offline-läge.");
+    }
+  }
+}
+
+// Lyssna på när enheten får tillbaka täckning ute i skogen
+window.addEventListener('online', async () => {
+  console.log("Nätverk tillgängligt! Synkar offline-markörer...");
+  const places = await getLocalPlaces();
+  const unsynced = places.filter(p => !p.synced);
+  for (const place of unsynced) {
+    await syncPlaceToSheets(place);
+  }
+});
+
+// Kör igång lagringen
+initAppStorage();
