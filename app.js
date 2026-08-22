@@ -220,21 +220,21 @@ document.getElementById('btn-save-confirm').addEventListener('click', () => {
 });
 
 
-
 // Spara nytt fynd till Google Sheets
 async function saveToGoogleSheets(placeData) {
   try {
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(placeData)
     });
-    console.log("Sparat till Google Sheets!");
+    console.log("Skickat till Google Sheets!");
   } catch (err) {
     console.error("Kunde inte spara till Sheets:", err);
   }
 }
+
 
 // Ladda sparade fynd från Google Sheets när appen startar
 async function loadFromGoogleSheets() {
