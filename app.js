@@ -365,3 +365,33 @@ document.getElementById('btn-recenter').addEventListener('click', () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }
+
+
+// Funktion för att ta bort markör från Google Sheets
+async function deleteFromGoogleSheets(placeId) {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'delete', id: placeId })
+    });
+    console.log("Borttagning skickad till Google Sheets för ID:", placeId);
+  } catch (err) {
+    console.error("Kunde inte ta bort från Sheets:", err);
+  }
+}
+
+// Uppdaterad funktion för att ta bort markör i webbappen och i Sheets
+window.removeCurrentMarker = function(placeId) {
+  const marker = markerMap.get(placeId);
+  if (marker && confirm("Vill du ta bort denna markör?")) {
+    map.removeLayer(marker);
+    savedMarkers = savedMarkers.filter(m => m !== marker);
+    markerMap.delete(placeId);
+    updateMarkerCount();
+    
+    // Ta bort från Google Sheets
+    deleteFromGoogleSheets(placeId);
+  }
+};
