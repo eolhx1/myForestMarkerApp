@@ -365,3 +365,110 @@ document.getElementById('btn-recenter').addEventListener('click', () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }
+
+// Hjälpfunktion för att beräkna avstånd mellan två koord-punkter (Haversine-formeln)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371; // Jordens radie i km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const d = R * c;
+  return d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1)} km`;
+}
+
+
+// Renderar hela listan med platser
+function renderListView() {
+  const container = document.getElementById('list-container');
+  if (!container) return;
+
+  if (savedMarkers.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-slate-400">
+        <p>Inga sparade skogsmarkörer än.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = savedMarkers.map(item => {
+    const lat = Number(item.lat);
+    const lng = Number(item.lng);
+    
+    // Beräkna avstånd om GPS-position finns
+    let distText = '';
+    if (currentCoords) {
+      const dist = calculateDistance(currentCoords[0], currentCoords[1], lat, lng);
+      if (dist) distText = `🧭 ${dist} bort`;
+    }
+
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    const earthUrl = `https://earth.google.com/web/@${lat},${lng},0a,500d,35y,0h,0t,0r`;
+
+    return `
+      <div class="bg-white rounded-3xl p-4 mb-4 border border-slate-100 shadow-sm space-y-3">
+        <!-- Tagg-rad -->
+        <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
+          <span class="bg-amber-100 text-amber-900 px-3 py-1 rounded-full flex items-center gap-1">
+            📍 ${item.category || 'Naturfynd'}
+          </span>
+          ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>` : ''}
+          <span class="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full ml-auto border border-emerald-100">
+            🍃 Sheets
+          </span>
+        </div>
+
+        <!-- Titel och Beskrivning -->
+        <div>
+          <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
+          ${item.description ? `
+            <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
+              "${item.description}"
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Bild (Visas om bilden finns angiven) -->
+        ${item.imageUrl ? `
+          <div class="overflow-hidden rounded-2xl h-44 w-full bg-slate-100">
+            <img src="${item.imageUrl}" class="w-full h-full object-cover" alt="Platsbild">
+          </div>
+        ` : ''}
+
+        <!-- Meta (Koordinater och datum) -->
+        <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
+          <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+          <span>${item.timestamp || ''}</span>
+        </div>
+
+        <!-- Åtgärdsknappar -->
+        <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
+          <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
+            🌐 Earth
+          </a>
+          <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
+            🗺️ Maps
+          </a>
+          <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('btn-show-list').addEventListener('click', () => {
+  document.getElementById('map-view').classList.add('hidden');
+  document.getElementById('list-view').classList.remove('hidden');
+  renderListView();
+});
+
+document.getElementById('btn-show-map').addEventListener('click', () => {
+  document.getElementById('list-view').classList.add('hidden');
+  document.getElementById('map-view').classList.remove('hidden');
+  setTimeout(() => map.invalidateSize(), 100);
+});
