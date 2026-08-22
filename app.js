@@ -433,13 +433,6 @@ function renderListView() {
           ` : ''}
         </div>
 
-        <!-- Bild (Visas om bilden finns angiven) -->
-        ${item.imageUrl ? `
-          <div class="overflow-hidden rounded-2xl h-44 w-full bg-slate-100">
-            <img src="${item.imageUrl}" class="w-full h-full object-cover" alt="Platsbild">
-          </div>
-        ` : ''}
-
         <!-- Meta (Koordinater och datum) -->
         <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
           <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
@@ -463,21 +456,42 @@ function renderListView() {
   }).join('');
 }
 
+// -----------------------------------------------------------------
+// Hantering av flikväxling (Karta vs Lista)
+// -----------------------------------------------------------------
 const btnList = document.getElementById('btn-show-list');
 const btnMap = document.getElementById('btn-show-map');
 
 if (btnList) {
   btnList.addEventListener('click', () => {
+    // Visa listvy, dölj kartvy
     document.getElementById('map-view')?.classList.add('hidden');
     document.getElementById('list-view')?.classList.remove('hidden');
+    
+    // Uppdatera knappars utseende
+    btnList.classList.add('bg-white', 'shadow-sm', 'text-emerald-800');
+    btnList.classList.remove('text-slate-600');
+    
+    btnMap.classList.remove('bg-white', 'shadow-sm', 'text-emerald-800');
+    btnMap.classList.add('text-slate-600');
+    
     renderListView();
   });
 }
 
 if (btnMap) {
   btnMap.addEventListener('click', () => {
+    // Visa kartvy, dölj listvy
     document.getElementById('list-view')?.classList.add('hidden');
     document.getElementById('map-view')?.classList.remove('hidden');
+    
+    // Uppdatera knappars utseende
+    btnMap.classList.add('bg-white', 'shadow-sm', 'text-emerald-800');
+    btnMap.classList.remove('text-slate-600');
+    
+    btnList.classList.remove('bg-white', 'shadow-sm', 'text-emerald-800');
+    btnList.classList.add('text-slate-600');
+    
     setTimeout(() => map.invalidateSize(), 100);
   });
 }
