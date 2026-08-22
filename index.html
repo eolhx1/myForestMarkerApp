@@ -27,6 +27,8 @@
     }
   </style>
 </head>
+
+
 <body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
 
   <!-- Header -->
@@ -70,6 +72,46 @@
 
   <!-- Map Container -->
   <div class="relative flex-1">
+      
+<!-- Kartväljare Meny (Överst till vänster på kartan) -->
+<div class="absolute top-4 left-4 z-[500] flex flex-col items-start gap-2">
+  <!-- Huvudknapp -->
+  <button id="map-selector-toggle" class="bg-white/95 backdrop-blur-md border border-slate-200 text-slate-800 px-3 py-2 rounded-2xl shadow-md flex items-center gap-2 font-semibold text-xs hover:bg-slate-50 transition">
+    <span class="text-base">🌲</span>
+    <span id="current-map-name">Skogstopo</span>
+    <span class="text-[10px] text-slate-400">▼</span>
+  </button>
+
+  <!-- Dropdown Meny -->
+  <div id="map-selector-menu" class="hidden bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl p-2 shadow-xl flex flex-col gap-1.5 w-52 animate-in fade-in zoom-in-95 duration-150">
+    <button data-tile="topo" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-emerald-500 bg-emerald-50/50">
+      <span class="text-xl">🌲</span>
+      <div>
+        <div class="font-bold text-xs text-slate-800">Skogstopo</div>
+        <div class="text-[10px] text-slate-500">Höjdkurvor & stigar</div>
+      </div>
+    </button>
+
+    <button data-tile="satellite" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
+      <span class="text-xl">🛰️</span>
+      <div>
+        <div class="font-bold text-xs text-slate-800">Satellitvy</div>
+        <div class="text-[10px] text-slate-500">Esri flygfoton</div>
+      </div>
+    </button>
+
+    <button data-tile="osm" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
+      <span class="text-xl">🗺️</span>
+      <div>
+        <div class="font-bold text-xs text-slate-800">Standardkarta</div>
+        <div class="text-[10px] text-slate-500">Vägar & översikt</div>
+      </div>
+    </button>
+  </div>
+</div>
+
+      
+      
     <div id="map" class="z-0"></div>
 
     <!-- Map Overlays Top -->

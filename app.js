@@ -247,3 +247,66 @@ document.getElementById('btn-recenter').addEventListener('click', () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }
+
+
+// Definiera de tre kartlagren
+const tileLayers = {
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '© OpenTopoMap'
+  }),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 18,
+    attribution: '© Esri'
+  }),
+  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  })
+};
+
+// Starta med Skogstopo
+let activeLayer = tileLayers.topo;
+activeLayer.addTo(map);
+
+// Meny Toggle
+const toggleBtn = document.getElementById('map-selector-toggle');
+const menu = document.getElementById('map-selector-menu');
+const currentMapName = document.getElementById('current-map-name');
+
+toggleBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  menu.classList.toggle('hidden');
+});
+
+// Stäng menyn vid klick utanför
+document.addEventListener('click', () => {
+  menu.classList.add('hidden');
+});
+
+// Byt kartlager vid val
+document.querySelectorAll('.map-option-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const layerKey = btn.getAttribute('data-tile');
+
+    // Ta bort nuvarande lager och lägg till det nya
+    map.removeLayer(activeLayer);
+    activeLayer = tileLayers[layerKey];
+    activeLayer.addTo(map);
+
+    // Uppdatera knapptext
+    const names = { topo: 'Skogstopo', satellite: 'Satellitvy', osm: 'Standardkarta' };
+    currentMapName.innerText = names[layerKey];
+
+    // Markera vald knapp i menyn
+    document.querySelectorAll('.map-option-btn').forEach(b => {
+      b.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+      b.classList.add('border-transparent');
+    });
+    btn.classList.remove('border-transparent');
+    btn.classList.add('border-emerald-500', 'bg-emerald-50/50');
+
+    menu.classList.add('hidden');
+  });
+});
