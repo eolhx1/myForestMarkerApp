@@ -412,7 +412,6 @@ function renderListView() {
 
     return `
       <div class="bg-white rounded-3xl p-4 mb-4 border border-slate-100 shadow-sm space-y-3">
-        <!-- Tagg-rad -->
         <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
           <span class="bg-amber-100 text-amber-900 px-3 py-1 rounded-full flex items-center gap-1">
             📍 ${item.category || 'Naturfynd'}
@@ -423,7 +422,6 @@ function renderListView() {
           </span>
         </div>
 
-        <!-- Titel och Beskrivning -->
         <div>
           <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
           ${item.description ? `
@@ -433,13 +431,11 @@ function renderListView() {
           ` : ''}
         </div>
 
-        <!-- Meta (Koordinater och datum) -->
         <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
           <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
           <span>${item.timestamp || ''}</span>
         </div>
 
-        <!-- Åtgärdsknappar -->
         <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
           <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
             🌐 Earth
@@ -462,36 +458,37 @@ function renderListView() {
 const btnList = document.getElementById('btn-show-list');
 const btnMap = document.getElementById('btn-show-map');
 
+function setTabState(activeBtn, inactiveBtn) {
+  if (!activeBtn || !inactiveBtn) return;
+  // Aktiv flik (Vit bakgrund med mörkgrön text)
+  activeBtn.style.backgroundColor = '#ffffff';
+  activeBtn.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+  activeBtn.style.color = '#065f46';
+  activeBtn.style.fontWeight = '600';
+
+  // Inaktiv flik (Genomskinlig bakgrund med grå text)
+  inactiveBtn.style.backgroundColor = 'transparent';
+  inactiveBtn.style.boxShadow = 'none';
+  inactiveBtn.style.color = '#475569';
+  inactiveBtn.style.fontWeight = 'normal';
+}
+
 if (btnList) {
   btnList.addEventListener('click', () => {
-    // Visa listvy, dölj kartvy
     document.getElementById('map-view')?.classList.add('hidden');
     document.getElementById('list-view')?.classList.remove('hidden');
     
-    // Uppdatera knappars utseende
-    btnList.classList.add('bg-white', 'shadow-sm', 'text-emerald-800');
-    btnList.classList.remove('text-slate-600');
-    
-    btnMap.classList.remove('bg-white', 'shadow-sm', 'text-emerald-800');
-    btnMap.classList.add('text-slate-600');
-    
+    setTabState(btnList, btnMap);
     renderListView();
   });
 }
 
 if (btnMap) {
   btnMap.addEventListener('click', () => {
-    // Visa kartvy, dölj listvy
     document.getElementById('list-view')?.classList.add('hidden');
     document.getElementById('map-view')?.classList.remove('hidden');
     
-    // Uppdatera knappars utseende
-    btnMap.classList.add('bg-white', 'shadow-sm', 'text-emerald-800');
-    btnMap.classList.remove('text-slate-600');
-    
-    btnList.classList.remove('bg-white', 'shadow-sm', 'text-emerald-800');
-    btnList.classList.add('text-slate-600');
-    
+    setTabState(btnMap, btnList);
     setTimeout(() => map.invalidateSize(), 100);
   });
 }
