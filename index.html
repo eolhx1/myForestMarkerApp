@@ -55,10 +55,10 @@
   <!-- Controls -->
   <div class="p-2 bg-slate-100 flex items-center gap-2">
     <div class="flex bg-slate-200/80 p-1 rounded-2xl flex-1 text-xs font-semibold">
-      <button id="btn-map" class="flex-1 py-2 px-3 bg-white rounded-xl shadow-sm text-emerald-800 flex items-center justify-center gap-1">
+      <button id="btn-show-map" class="flex-1 py-2 px-3 bg-white rounded-xl shadow-sm text-emerald-800 flex items-center justify-center gap-1">
         🗺️ Karta & Topo
       </button>
-      <button id="btn-list" class="flex-1 py-2 px-3 text-slate-600 flex items-center justify-center gap-1">
+      <button id="btn-show-list" class="flex-1 py-2 px-3 text-slate-600 flex items-center justify-center gap-1">
         📋 Lista (<span class="marker-count-val">0</span>)
       </button>
     </div>
@@ -67,67 +67,78 @@
     </button>
   </div>
 
-  <!-- Map Container -->
-  <div class="relative flex-1">
+  <!-- Main View Area (Map + List container) -->
+  <div class="relative flex-1 overflow-hidden">
       
-    <!-- Kartväljare Meny (Överst till vänster på kartan) -->
-    <div class="absolute top-3 left-3 z-[400] flex flex-col items-start gap-2">
-      <button id="map-selector-toggle" class="bg-white/95 backdrop-blur border border-slate-200 text-slate-800 px-3 py-1.5 rounded-full shadow text-xs font-bold flex items-center gap-1.5 hover:bg-slate-50 transition">
-        <span>🥞 🌲</span>
-        <span id="current-map-name">Skogstopo</span>
-        <span class="text-[10px] text-slate-400">▼</span>
-      </button>
-
-      <!-- Dropdown Meny -->
-      <div id="map-selector-menu" class="hidden bg-white/95 backdrop-blur border border-slate-200 rounded-2xl p-2 shadow-xl flex flex-col gap-1.5 w-52 transition">
-        <button data-tile="topo" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-emerald-500 bg-emerald-50/50">
-          <span class="text-xl">🌲</span>
-          <div>
-            <div class="font-bold text-xs text-slate-800">Skogstopo</div>
-            <div class="text-[10px] text-slate-500">Höjdkurvor & stigar</div>
-          </div>
+    <!-- 1. KARTVY -->
+    <div id="map-view" class="w-full h-full relative">
+      <!-- Kartväljare Meny (Överst till vänster på kartan) -->
+      <div class="absolute top-3 left-3 z-[400] flex flex-col items-start gap-2">
+        <button id="map-selector-toggle" class="bg-white/95 backdrop-blur border border-slate-200 text-slate-800 px-3 py-1.5 rounded-full shadow text-xs font-bold flex items-center gap-1.5 hover:bg-slate-50 transition">
+          <span>🥞 🌲</span>
+          <span id="current-map-name">Skogstopo</span>
+          <span class="text-[10px] text-slate-400">▼</span>
         </button>
 
-        <button data-tile="satellite" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
-          <span class="text-xl">🛰️</span>
-          <div>
-            <div class="font-bold text-xs text-slate-800">Satellitvy</div>
-            <div class="text-[10px] text-slate-500">Esri flygfoton</div>
-          </div>
-        </button>
+        <!-- Dropdown Meny -->
+        <div id="map-selector-menu" class="hidden bg-white/95 backdrop-blur border border-slate-200 rounded-2xl p-2 shadow-xl flex flex-col gap-1.5 w-52 transition">
+          <button data-tile="topo" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-emerald-500 bg-emerald-50/50">
+            <span class="text-xl">🌲</span>
+            <div>
+              <div class="font-bold text-xs text-slate-800">Skogstopo</div>
+              <div class="text-[10px] text-slate-500">Höjdkurvor & stigar</div>
+            </div>
+          </button>
 
-        <button data-tile="osm" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
-          <span class="text-xl">🗺️</span>
-          <div>
-            <div class="font-bold text-xs text-slate-800">Standardkarta</div>
-            <div class="text-[10px] text-slate-500">Vägar & översikt</div>
-          </div>
+          <button data-tile="satellite" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
+            <span class="text-xl">🛰️</span>
+            <div>
+              <div class="font-bold text-xs text-slate-800">Satellitvy</div>
+              <div class="text-[10px] text-slate-500">Esri flygfoton</div>
+            </div>
+          </button>
+
+          <button data-tile="osm" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
+            <span class="text-xl">🗺️</span>
+            <div>
+              <div class="font-bold text-xs text-slate-800">Standardkarta</div>
+              <div class="text-[10px] text-slate-500">Vägar & översikt</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Själva Kartan -->
+      <div id="map" class="z-0"></div>
+
+      <!-- Floating Buttons Right -->
+      <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
+        <button id="btn-recenter" class="w-10 h-10 bg-white rounded-2xl shadow flex items-center justify-center text-blue-600 border border-slate-200 font-bold text-lg">
+          🎯
         </button>
+        <button class="w-10 h-10 bg-white rounded-2xl shadow flex items-center justify-center text-emerald-600 border border-slate-200 font-bold text-lg">
+          🌐
+        </button>
+      </div>
+
+      <!-- Map Overlay Bottom Footer -->
+      <div class="absolute bottom-4 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-medium text-slate-700 flex items-center gap-2 border border-slate-200">
+        <span class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 
+          <strong><span class="marker-count-val">0</span> platser</strong> på kartan
+        </span>
+        <span class="text-slate-300">|</span>
+        <span id="gps-accuracy-footer">GPS: Söker...</span>
       </div>
     </div>
 
-    <!-- Själva Kartan -->
-    <div id="map" class="z-0"></div>
-
-    <!-- Floating Buttons Right -->
-    <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
-      <button id="btn-recenter" class="w-10 h-10 bg-white rounded-2xl shadow flex items-center justify-center text-blue-600 border border-slate-200 font-bold text-lg">
-        🎯
-      </button>
-      <button class="w-10 h-10 bg-white rounded-2xl shadow flex items-center justify-center text-emerald-600 border border-slate-200 font-bold text-lg">
-        🌐
-      </button>
+    <!-- 2. LISTVY (Döljs från start via 'hidden') -->
+    <div id="list-view" class="hidden w-full h-full p-4 overflow-y-auto bg-slate-50">
+      <div id="list-container" class="max-w-md mx-auto">
+        <!-- Markörer renderas här av app.js -->
+      </div>
     </div>
 
-    <!-- Map Overlay Bottom Footer -->
-    <div class="absolute bottom-4 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-medium text-slate-700 flex items-center gap-2 border border-slate-200">
-      <span class="flex items-center gap-1">
-        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 
-        <strong><span class="marker-count-val">0</span> platser</strong> på kartan
-      </span>
-      <span class="text-slate-300">|</span>
-      <span id="gps-accuracy-footer">GPS: Söker...</span>
-    </div>
   </div>
   
   <!-- Modal: Markera denna plats -->
