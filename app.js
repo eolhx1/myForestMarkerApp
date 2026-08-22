@@ -132,7 +132,7 @@ const categories = [
 
 let selectedCategory = categories[0];
 let selectedAmount = 'Rikligt med fynd';
-let savedMarkers = [];
+let savedPlaces = []; // Sparar rådata om alla platser
 let markerMap = new Map();
 let userPositionMarker = null;
 let userAccuracyCircle = null;
@@ -295,28 +295,31 @@ window.removeCurrentMarker = function(placeId) {
   const marker = markerMap.get(placeId);
   if (marker && confirm("Vill du ta bort denna markör?")) {
     map.removeLayer(marker);
-    savedMarkers = savedMarkers.filter(m => m !== marker);
+    savedPlaces = savedPlaces.filter(p => String(p.id) !== String(placeId));
     markerMap.delete(placeId);
     updateMarkerCount();
+    renderListView(); // Uppdatera även listan om den är öppen
     
     deleteFromGoogleSheets(placeId);
   }
 };
 
 function updateMarkerCount() {
-  document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedMarkers.length);
+  document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
 }
 
 function addPlaceToMap(place) {
-  // VIKTIGT: Använd befintligt id från Sheets om det finns!
   const placeId = String(place.id || ('marker_' + Date.now()));
   place.id = placeId;
 
   const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
   markerMap.set(placeId, marker);
   marker.bindPopup(createPopupContent(place, placeId));
-  savedMarkers.push(marker);
+  
+  // Spara datan i vår plats-array
+  savedPlaces.push(place);
   updateMarkerCount();
+  renderListView(); // Uppdatera listvyn när ny plats läggs till
   return marker;
 }
 
@@ -366,7 +369,9 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }
 
-// Hjälpfunktion för att beräkna avstånd mellan två koord-punkter (Haversine-formeln)
+// -----------------------------------------------------------------
+// 6. Listvy & Avståndsberäkning
+// -----------------------------------------------------------------
 function calculateDistance(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
   const R = 6371; // Jordens radie i km
@@ -380,13 +385,11 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1)} km`;
 }
 
-
-// Renderar hela listan med platser
 function renderListView() {
   const container = document.getElementById('list-container');
   if (!container) return;
 
-  if (savedMarkers.length === 0) {
+  if (savedPlaces.length === 0) {
     container.innerHTML = `
       <div class="p-8 text-center text-slate-400">
         <p>Inga sparade skogsmarkörer än.</p>
@@ -394,11 +397,10 @@ function renderListView() {
     return;
   }
 
-  container.innerHTML = savedMarkers.map(item => {
+  container.innerHTML = savedPlaces.map(item => {
     const lat = Number(item.lat);
     const lng = Number(item.lng);
     
-    // Beräkna avstånd om GPS-position finns
     let distText = '';
     if (currentCoords) {
       const dist = calculateDistance(currentCoords[0], currentCoords[1], lat, lng);
@@ -461,14 +463,21 @@ function renderListView() {
   }).join('');
 }
 
-document.getElementById('btn-show-list').addEventListener('click', () => {
-  document.getElementById('map-view').classList.add('hidden');
-  document.getElementById('list-view').classList.remove('hidden');
-  renderListView();
-});
+const btnList = document.getElementById('btn-show-list');
+const btnMap = document.getElementById('btn-show-map');
 
-document.getElementById('btn-show-map').addEventListener('click', () => {
-  document.getElementById('list-view').classList.add('hidden');
-  document.getElementById('map-view').classList.remove('hidden');
-  setTimeout(() => map.invalidateSize(), 100);
-});
+if (btnList) {
+  btnList.addEventListener('click', () => {
+    document.getElementById('map-view')?.classList.add('hidden');
+    document.getElementById('list-view')?.classList.remove('hidden');
+    renderListView();
+  });
+}
+
+if (btnMap) {
+  btnMap.addEventListener('click', () => {
+    document.getElementById('list-view')?.classList.add('hidden');
+    document.getElementById('map-view')?.classList.remove('hidden');
+    setTimeout(() => map.invalidateSize(), 100);
+  });
+}
