@@ -15,7 +15,7 @@
 
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    #map { height: calc(100vh - 160px); width: 100%; }
+    #map { height: 100%; width: 100%; }
     .custom-marker {
       background: #eab308;
       border: 3px solid white;
@@ -28,12 +28,10 @@
   </style>
 </head>
 
-
 <body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
 
   <!-- Header -->
   <header class="p-3 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm">
-    <!-- GPS Badge i headern -->
     <span class="inline-flex items-center gap-1 text-xs bg-slate-100 px-2.5 py-1.5 rounded-full border border-slate-200 font-medium text-slate-600">
       <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 
       <span id="gps-accuracy-badge">Söker GPS...</span> 🔄
@@ -60,10 +58,9 @@
       <button id="btn-map" class="flex-1 py-2 px-3 bg-white rounded-xl shadow-sm text-emerald-800 flex items-center justify-center gap-1">
         🗺️ Karta & Topo
       </button>
-<button id="btn-list" class="flex-1 py-2 px-3 text-slate-600 flex items-center justify-center gap-1">
-  📋 Lista (<span id="marker-count">1</span>)
-</button>
-
+      <button id="btn-list" class="flex-1 py-2 px-3 text-slate-600 flex items-center justify-center gap-1">
+        📋 Lista (<span class="marker-count-val">0</span>)
+      </button>
     </div>
     <button id="btn-mark" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-3 px-4 rounded-2xl shadow flex items-center gap-1.5">
       📍 Markera min position
@@ -73,53 +70,46 @@
   <!-- Map Container -->
   <div class="relative flex-1">
       
-<!-- Kartväljare Meny (Överst till vänster på kartan) -->
-<div class="absolute top-4 left-4 z-[500] flex flex-col items-start gap-2">
-  <!-- Huvudknapp -->
-  <button id="map-selector-toggle" class="bg-white/95 backdrop-blur-md border border-slate-200 text-slate-800 px-3 py-2 rounded-2xl shadow-md flex items-center gap-2 font-semibold text-xs hover:bg-slate-50 transition">
-    <span class="text-base">🌲</span>
-    <span id="current-map-name">Skogstopo</span>
-    <span class="text-[10px] text-slate-400">▼</span>
-  </button>
+    <!-- Kartväljare Meny (Överst till vänster på kartan) -->
+    <div class="absolute top-3 left-3 z-[400] flex flex-col items-start gap-2">
+      <button id="map-selector-toggle" class="bg-white/95 backdrop-blur border border-slate-200 text-slate-800 px-3 py-1.5 rounded-full shadow text-xs font-bold flex items-center gap-1.5 hover:bg-slate-50 transition">
+        <span>🥞 🌲</span>
+        <span id="current-map-name">Skogstopo</span>
+        <span class="text-[10px] text-slate-400">▼</span>
+      </button>
 
-  <!-- Dropdown Meny -->
-  <div id="map-selector-menu" class="hidden bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl p-2 shadow-xl flex flex-col gap-1.5 w-52 animate-in fade-in zoom-in-95 duration-150">
-    <button data-tile="topo" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-emerald-500 bg-emerald-50/50">
-      <span class="text-xl">🌲</span>
-      <div>
-        <div class="font-bold text-xs text-slate-800">Skogstopo</div>
-        <div class="text-[10px] text-slate-500">Höjdkurvor & stigar</div>
+      <!-- Dropdown Meny -->
+      <div id="map-selector-menu" class="hidden bg-white/95 backdrop-blur border border-slate-200 rounded-2xl p-2 shadow-xl flex flex-col gap-1.5 w-52 transition">
+        <button data-tile="topo" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-emerald-500 bg-emerald-50/50">
+          <span class="text-xl">🌲</span>
+          <div>
+            <div class="font-bold text-xs text-slate-800">Skogstopo</div>
+            <div class="text-[10px] text-slate-500">Höjdkurvor & stigar</div>
+          </div>
+        </button>
+
+        <button data-tile="satellite" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
+          <span class="text-xl">🛰️</span>
+          <div>
+            <div class="font-bold text-xs text-slate-800">Satellitvy</div>
+            <div class="text-[10px] text-slate-500">Esri flygfoton</div>
+          </div>
+        </button>
+
+        <button data-tile="osm" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
+          <span class="text-xl">🗺️</span>
+          <div>
+            <div class="font-bold text-xs text-slate-800">Standardkarta</div>
+            <div class="text-[10px] text-slate-500">Vägar & översikt</div>
+          </div>
+        </button>
       </div>
-    </button>
-
-    <button data-tile="satellite" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
-      <span class="text-xl">🛰️</span>
-      <div>
-        <div class="font-bold text-xs text-slate-800">Satellitvy</div>
-        <div class="text-[10px] text-slate-500">Esri flygfoton</div>
-      </div>
-    </button>
-
-    <button data-tile="osm" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
-      <span class="text-xl">🗺️</span>
-      <div>
-        <div class="font-bold text-xs text-slate-800">Standardkarta</div>
-        <div class="text-[10px] text-slate-500">Vägar & översikt</div>
-      </div>
-    </button>
-  </div>
-</div>
-
-      
-      
-    <div id="map" class="z-0"></div>
-
-    <!-- Map Overlays Top -->
-    <div class="absolute top-3 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-bold flex items-center gap-1.5 border border-slate-200">
-      🥞 🌲 Skogstopo
     </div>
 
-    <!-- Map Floating Buttons Right -->
+    <!-- Själva Kartan -->
+    <div id="map" class="z-0"></div>
+
+    <!-- Floating Buttons Right -->
     <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
       <button id="btn-recenter" class="w-10 h-10 bg-white rounded-2xl shadow flex items-center justify-center text-blue-600 border border-slate-200 font-bold text-lg">
         🎯
@@ -129,24 +119,21 @@
       </button>
     </div>
 
-    <!-- Map Overlay Bottom (Här ska footern ligga!) -->
+    <!-- Map Overlay Bottom Footer -->
     <div class="absolute bottom-4 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-medium text-slate-700 flex items-center gap-2 border border-slate-200">
-<span class="flex items-center gap-1">
-  <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 
-  <strong><span id="marker-count">1</span> platser</strong> på kartan
-</span>
-
+      <span class="flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 
+        <strong><span class="marker-count-val">0</span> platser</strong> på kartan
+      </span>
       <span class="text-slate-300">|</span>
       <span id="gps-accuracy-footer">GPS: Söker...</span>
     </div>
   </div>
   
-  
-    <!-- Modal: Markera denna plats -->
+  <!-- Modal: Markera denna plats -->
   <div id="save-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
     <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200">
       
-      <!-- Modal Header -->
       <div class="bg-emerald-800 text-white p-4 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <span class="text-2xl">🍄</span>
@@ -160,10 +147,7 @@
         </button>
       </div>
 
-      <!-- Scrollbart innehåll -->
       <div class="p-4 overflow-y-auto space-y-5 flex-1 text-slate-800 text-xs">
-        
-        <!-- GPS Info Kort -->
         <div class="bg-slate-50 border border-slate-200 p-3 rounded-2xl flex items-center justify-between">
           <div class="space-y-0.5">
             <div class="font-mono text-sm font-semibold text-slate-800 flex items-center gap-2">
@@ -177,21 +161,16 @@
           </button>
         </div>
 
-        <!-- Vad finns på platsen Grid -->
         <div>
           <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-2">VAD FINNS PÅ PLATSEN?</label>
-          <div id="category-grid" class="grid grid-cols-3 gap-2">
-            <!-- Skapas dynamiskt i JS -->
-          </div>
+          <div id="category-grid" class="grid grid-cols-3 gap-2"></div>
         </div>
 
-        <!-- Namn / Rubrik -->
         <div>
           <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">NAMN / RUBRIK PÅ PLATSEN</label>
           <input type="text" id="input-title" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-medium focus:outline-none focus:border-emerald-600 focus:bg-white transition" placeholder="t.ex. Gula kantareller i mossig skog">
         </div>
 
-        <!-- Mängd / Bestånd -->
         <div>
           <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">MÄNGD / BESTÅND</label>
           <div id="amount-selector" class="grid grid-cols-2 gap-2">
@@ -202,25 +181,20 @@
           </div>
         </div>
 
-        <!-- Anteckningar & Tips -->
         <div>
           <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">ANTECKNINGAR & TIPS (VALFRITT)</label>
           <textarea id="input-notes" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-emerald-600 focus:bg-white transition" placeholder="t.ex. Växer under gamla granar, bäst att besöka efter regn..."></textarea>
         </div>
-
       </div>
 
-      <!-- Modal Footer -->
       <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
         <span class="text-[11px] text-slate-500 font-medium">GPS: <strong id="modal-footer-gps" class="text-slate-700">±3m</strong></span>
         <button id="btn-save-confirm" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 px-5 rounded-2xl shadow-md flex items-center gap-2">
           📍 Markera & Spara plats
         </button>
       </div>
-
     </div>
   </div>
-
 
   <script src="app.js"></script>
 </body>

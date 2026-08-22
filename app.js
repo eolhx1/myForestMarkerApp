@@ -1,14 +1,71 @@
-// Initiera kartan centrerad på Sverige från början
+// Initiera kartan centrerad på Sverige
 const map = L.map('map', { zoomControl: false }).setView([59.3293, 18.0686], 13);
-
-L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-  maxZoom: 17,
-  attribution: '© OpenStreetMap'
-}).addTo(map);
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Ikoner
+// -----------------------------------------------------------------
+// 1. Kartlager & Kartväljare
+// -----------------------------------------------------------------
+const tileLayers = {
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '© OpenTopoMap'
+  }),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 18,
+    attribution: '© Esri'
+  }),
+  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  })
+};
+
+// Starta med Skogstopo som aktivt lager
+let activeLayer = tileLayers.topo;
+activeLayer.addTo(map);
+
+const toggleBtn = document.getElementById('map-selector-toggle');
+const menu = document.getElementById('map-selector-menu');
+const currentMapName = document.getElementById('current-map-name');
+
+if (toggleBtn && menu) {
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', () => {
+    menu.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.map-option-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const layerKey = btn.getAttribute('data-tile');
+
+      map.removeLayer(activeLayer);
+      activeLayer = tileLayers[layerKey];
+      activeLayer.addTo(map);
+
+      const names = { topo: 'Skogstopo', satellite: 'Satellitvy', osm: 'Standardkarta' };
+      if (currentMapName) currentMapName.innerText = names[layerKey];
+
+      document.querySelectorAll('.map-option-btn').forEach(b => {
+        b.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+        b.classList.add('border-transparent');
+      });
+      btn.classList.remove('border-transparent');
+      btn.classList.add('border-emerald-500', 'bg-emerald-50/50');
+
+      menu.classList.add('hidden');
+    });
+  });
+}
+
+// -----------------------------------------------------------------
+// 2. Ikoner & Stilmallar
+// -----------------------------------------------------------------
 const mushroomIcon = L.divIcon({
   className: 'custom-marker',
   html: `
@@ -34,7 +91,6 @@ const myLocationIcon = L.divIcon({
   iconAnchor: [11, 11]
 });
 
-// CSS-anpassningar
 const styleSheet = document.createElement("style");
 styleSheet.innerText = `
   @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
@@ -43,7 +99,9 @@ styleSheet.innerText = `
 `;
 document.head.appendChild(styleSheet);
 
-// Kategorilista
+// -----------------------------------------------------------------
+// 3. Tillstånd & Kategorier
+// -----------------------------------------------------------------
 const categories = [
   { id: 'gula-kantareller', name: 'Gula kantareller', icon: '🍄' },
   { id: 'trattkantareller', name: 'Trattkantareller', icon: '🍂' },
@@ -61,7 +119,6 @@ const categories = [
   { id: 'annat', name: 'Annat naturfynd', icon: '📍' }
 ];
 
-// Tillståndshantering
 let selectedCategory = categories[0];
 let selectedAmount = 'Rikligt med fynd';
 let savedMarkers = [];
@@ -71,9 +128,10 @@ let userAccuracyCircle = null;
 let currentCoords = null;
 let currentAccuracy = 0;
 
-// Rendera kategoriknappar i modalen
+// Renderingsfunktioner
 function renderCategoryGrid() {
   const grid = document.getElementById('category-grid');
+  if (!grid) return;
   grid.innerHTML = categories.map(cat => {
     const isSelected = cat.id === selectedCategory.id;
     return `
@@ -94,7 +152,6 @@ function renderCategoryGrid() {
   });
 }
 
-// Mängdknappar
 document.querySelectorAll('.amount-btn').forEach(btn => {
   btn.addEventListener('click', (e) => {
     selectedAmount = e.currentTarget.getAttribute('data-amount');
@@ -107,7 +164,7 @@ document.querySelectorAll('.amount-btn').forEach(btn => {
   });
 });
 
-// Modal-öppning och stängning
+// Modal-hantering
 const modal = document.getElementById('save-modal');
 
 document.getElementById('btn-mark').addEventListener('click', () => {
@@ -127,7 +184,6 @@ document.getElementById('btn-mark').addEventListener('click', () => {
 
 document.getElementById('modal-close').addEventListener('click', () => modal.classList.add('hidden'));
 
-// Spara från modal
 document.getElementById('btn-save-confirm').addEventListener('click', () => {
   const title = document.getElementById('input-title').value || selectedCategory.name;
   const notes = document.getElementById('input-notes').value || 'Inga anteckningar angivna.';
@@ -150,7 +206,9 @@ document.getElementById('btn-save-confirm').addEventListener('click', () => {
   marker.openPopup();
 });
 
-// Skapa Popup innehåll
+// -----------------------------------------------------------------
+// 4. Markör- & Popup-hantering
+// -----------------------------------------------------------------
 function createPopupContent(place, placeId) {
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
   const googleEarthUrl = `https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r`;
@@ -194,7 +252,7 @@ window.removeCurrentMarker = function(placeId) {
 };
 
 function updateMarkerCount() {
-  document.querySelectorAll('#marker-count').forEach(el => el.innerText = savedMarkers.length);
+  document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedMarkers.length);
 }
 
 function addPlaceToMap(place) {
@@ -207,7 +265,9 @@ function addPlaceToMap(place) {
   return marker;
 }
 
-// GPS-funktioner
+// -----------------------------------------------------------------
+// 5. GPS-spårning
+// -----------------------------------------------------------------
 function updatePosition(position, autoCenter = false) {
   const { latitude, longitude, accuracy } = position.coords;
   currentCoords = [latitude, longitude];
@@ -247,66 +307,3 @@ document.getElementById('btn-recenter').addEventListener('click', () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }
-
-
-// Definiera de tre kartlagren
-const tileLayers = {
-  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-    maxZoom: 17,
-    attribution: '© OpenTopoMap'
-  }),
-  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 18,
-    attribution: '© Esri'
-  }),
-  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-  })
-};
-
-// Starta med Skogstopo
-let activeLayer = tileLayers.topo;
-activeLayer.addTo(map);
-
-// Meny Toggle
-const toggleBtn = document.getElementById('map-selector-toggle');
-const menu = document.getElementById('map-selector-menu');
-const currentMapName = document.getElementById('current-map-name');
-
-toggleBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  menu.classList.toggle('hidden');
-});
-
-// Stäng menyn vid klick utanför
-document.addEventListener('click', () => {
-  menu.classList.add('hidden');
-});
-
-// Byt kartlager vid val
-document.querySelectorAll('.map-option-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const layerKey = btn.getAttribute('data-tile');
-
-    // Ta bort nuvarande lager och lägg till det nya
-    map.removeLayer(activeLayer);
-    activeLayer = tileLayers[layerKey];
-    activeLayer.addTo(map);
-
-    // Uppdatera knapptext
-    const names = { topo: 'Skogstopo', satellite: 'Satellitvy', osm: 'Standardkarta' };
-    currentMapName.innerText = names[layerKey];
-
-    // Markera vald knapp i menyn
-    document.querySelectorAll('.map-option-btn').forEach(b => {
-      b.classList.remove('border-emerald-500', 'bg-emerald-50/50');
-      b.classList.add('border-transparent');
-    });
-    btn.classList.remove('border-transparent');
-    btn.classList.add('border-emerald-500', 'bg-emerald-50/50');
-
-    menu.classList.add('hidden');
-  });
-});
