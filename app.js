@@ -12,7 +12,6 @@ setTimeout(() => {
   map.invalidateSize();
 }, 100);
 
-
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // -----------------------------------------------------------------
@@ -140,7 +139,6 @@ let userAccuracyCircle = null;
 let currentCoords = null;
 let currentAccuracy = 0;
 
-// Renderingsfunktioner
 function renderCategoryGrid() {
   const grid = document.getElementById('category-grid');
   if (!grid) return;
@@ -176,7 +174,6 @@ document.querySelectorAll('.amount-btn').forEach(btn => {
   });
 });
 
-// Modal-hantering
 const modal = document.getElementById('save-modal');
 
 document.getElementById('btn-mark').addEventListener('click', () => {
@@ -210,17 +207,13 @@ document.getElementById('btn-save-confirm').addEventListener('click', () => {
     timestamp: new Date().toISOString().split('T')[0]
   };
 
-  // 1. Visa markören på kartan direkt
   const marker = addPlaceToMap(newPlace);
   modal.classList.add('hidden');
   marker.openPopup();
 
-  // 2. Skicka till Google Sheets i bakgrunden
   saveToGoogleSheets(newPlace);
 });
 
-
-// Spara nytt fynd till Google Sheets
 async function saveToGoogleSheets(placeData) {
   try {
     await fetch(SCRIPT_URL, {
@@ -235,8 +228,6 @@ async function saveToGoogleSheets(placeData) {
   }
 }
 
-
-// Ladda sparade fynd från Google Sheets när appen startar
 async function loadFromGoogleSheets() {
   try {
     const response = await fetch(SCRIPT_URL);
@@ -250,9 +241,7 @@ async function loadFromGoogleSheets() {
   }
 }
 
-// Ladda in sparade markörer direkt vid start
 loadFromGoogleSheets();
-
 
 // -----------------------------------------------------------------
 // 4. Markör- & Popup-hantering
@@ -260,6 +249,9 @@ loadFromGoogleSheets();
 function createPopupContent(place, placeId) {
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
   const googleEarthUrl = `https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r`;
+
+  const latNum = Number(place.lat) || 0;
+  const lngNum = Number(place.lng) || 0;
 
   return `
     <div class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200" style="width: 280px; max-width: calc(100vw - 40px);">
@@ -269,16 +261,12 @@ function createPopupContent(place, placeId) {
       </div>
       <div class="px-3 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold">
         <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">${place.category}</span>
-        <span class="text-slate-500">• ${place.distance} bort</span>
       </div>
-      <div class="p-2">
-        <img src="${place.imageUrl}" class="w-full h-32 object-cover rounded-xl">
-      </div>
-      <div class="px-3 py-1.5 text-xs text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
+      <div class="px-3 py-2 text-xs text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
         "${place.description}"
       </div>
       <div class="p-3 space-y-1 text-xs text-slate-700">
-        <div>📍 <span class="font-mono text-slate-600">${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}</span></div>
+        <div>📍 <span class="font-mono text-slate-600">${latNum.toFixed(5)}, ${lngNum.toFixed(5)}</span></div>
         <div>🕐 <strong>Tid:</strong> ${place.timestamp}</div>
       </div>
       <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex gap-2">
@@ -289,6 +277,20 @@ function createPopupContent(place, placeId) {
   `;
 }
 
+async function deleteFromGoogleSheets(placeId) {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'delete', id: placeId })
+    });
+    console.log("Borttagning skickad till Google Sheets för ID:", placeId);
+  } catch (err) {
+    console.error("Kunde inte ta bort från Sheets:", err);
+  }
+}
+
 window.removeCurrentMarker = function(placeId) {
   const marker = markerMap.get(placeId);
   if (marker && confirm("Vill du ta bort denna markör?")) {
@@ -296,6 +298,8 @@ window.removeCurrentMarker = function(placeId) {
     savedMarkers = savedMarkers.filter(m => m !== marker);
     markerMap.delete(placeId);
     updateMarkerCount();
+    
+    deleteFromGoogleSheets(placeId);
   }
 };
 
@@ -304,7 +308,10 @@ function updateMarkerCount() {
 }
 
 function addPlaceToMap(place) {
-  const placeId = 'marker_' + Date.now();
+  // VIKTIGT: Använd befintligt id från Sheets om det finns!
+  const placeId = String(place.id || ('marker_' + Date.now()));
+  place.id = placeId;
+
   const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
   markerMap.set(placeId, marker);
   marker.bindPopup(createPopupContent(place, placeId));
@@ -336,15 +343,10 @@ function updatePosition(position, autoCenter = false) {
     userPositionMarker = L.marker([latitude, longitude], { icon: myLocationIcon, zIndexOffset: 1000 }).addTo(map);
   }
 
-
-if (autoCenter) map.flyTo([latitude, longitude], 16, { 
-    duration: 1.5, // Tiden i sekunder för animeringen
-    easeLinearity: 0.25 
-});
-
-  
-  
-  
+  if (autoCenter) map.flyTo([latitude, longitude], 16, { 
+      duration: 1.5,
+      easeLinearity: 0.25 
+  });
 }
 
 if ('geolocation' in navigator) {
@@ -356,42 +358,10 @@ if ('geolocation' in navigator) {
   );
 }
 
-
 document.getElementById('btn-recenter').addEventListener('click', () => {
   if (currentCoords) map.flyTo(currentCoords, 16, { animate: true, duration: 1.5 });
 });
 
-
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }
-
-
-// Funktion för att ta bort markör från Google Sheets
-async function deleteFromGoogleSheets(placeId) {
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'delete', id: placeId })
-    });
-    console.log("Borttagning skickad till Google Sheets för ID:", placeId);
-  } catch (err) {
-    console.error("Kunde inte ta bort från Sheets:", err);
-  }
-}
-
-// Uppdaterad funktion för att ta bort markör i webbappen och i Sheets
-window.removeCurrentMarker = function(placeId) {
-  const marker = markerMap.get(placeId);
-  if (marker && confirm("Vill du ta bort denna markör?")) {
-    map.removeLayer(marker);
-    savedMarkers = savedMarkers.filter(m => m !== marker);
-    markerMap.delete(placeId);
-    updateMarkerCount();
-    
-    // Ta bort från Google Sheets
-    deleteFromGoogleSheets(placeId);
-  }
-};
