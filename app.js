@@ -1,5 +1,15 @@
-// Initiera kartan centrerad på Sverige
-const map = L.map('map', { zoomControl: false }).setView([59.3293, 18.0686], 13);
+// 
+// filename: app.js
+//
+
+// Initiera kartan centrerad på Sverige (zoom 5 visar hela landet)
+const map = L.map('map', { zoomControl: false }).setView([62.0, 15.0], 5);
+
+// Tvinga Leaflet att räkna om containerns storlek så att kartan fyller hela skärmen
+setTimeout(() => {
+  map.invalidateSize();
+}, 100);
+
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
