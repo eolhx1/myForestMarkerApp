@@ -298,7 +298,15 @@ function updatePosition(position, autoCenter = false) {
     userPositionMarker = L.marker([latitude, longitude], { icon: myLocationIcon, zIndexOffset: 1000 }).addTo(map);
   }
 
-  if (autoCenter) map.setView([latitude, longitude], 16);
+
+if (autoCenter) map.flyTo([latitude, longitude], 16, { 
+    duration: 1.5, // Tiden i sekunder för animeringen
+    easeLinearity: 0.25 
+});
+
+  
+  
+  
 }
 
 if ('geolocation' in navigator) {
@@ -310,9 +318,11 @@ if ('geolocation' in navigator) {
   );
 }
 
+
 document.getElementById('btn-recenter').addEventListener('click', () => {
-  if (currentCoords) map.flyTo(currentCoords, 16, { animate: true });
+  if (currentCoords) map.flyTo(currentCoords, 16, { animate: true, duration: 1.5 });
 });
+
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
