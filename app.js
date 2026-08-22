@@ -458,19 +458,22 @@ function renderListView() {
 const btnList = document.getElementById('btn-show-list');
 const btnMap = document.getElementById('btn-show-map');
 
-function setTabState(activeBtn, inactiveBtn) {
+function updateTabStyles(activeBtn, inactiveBtn) {
   if (!activeBtn || !inactiveBtn) return;
-  // Aktiv flik (Vit bakgrund med mörkgrön text)
+
+  // Aktiv knapp (Vit bakgrund, mörkgrön text, rundade hörn)
   activeBtn.style.backgroundColor = '#ffffff';
-  activeBtn.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
   activeBtn.style.color = '#065f46';
+  activeBtn.style.borderRadius = '0.75rem'; // 12px runda hörn (rounded-xl)
+  activeBtn.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
   activeBtn.style.fontWeight = '600';
 
-  // Inaktiv flik (Genomskinlig bakgrund med grå text)
+  // Inaktiv knapp (Genomskinlig bakgrund, grå text, rundade hörn)
   inactiveBtn.style.backgroundColor = 'transparent';
-  inactiveBtn.style.boxShadow = 'none';
   inactiveBtn.style.color = '#475569';
-  inactiveBtn.style.fontWeight = 'normal';
+  inactiveBtn.style.borderRadius = '0.75rem';
+  inactiveBtn.style.boxShadow = 'none';
+  inactiveBtn.style.fontWeight = '500';
 }
 
 if (btnList) {
@@ -478,7 +481,7 @@ if (btnList) {
     document.getElementById('map-view')?.classList.add('hidden');
     document.getElementById('list-view')?.classList.remove('hidden');
     
-    setTabState(btnList, btnMap);
+    updateTabStyles(btnList, btnMap);
     renderListView();
   });
 }
@@ -488,7 +491,7 @@ if (btnMap) {
     document.getElementById('list-view')?.classList.add('hidden');
     document.getElementById('map-view')?.classList.remove('hidden');
     
-    setTabState(btnMap, btnList);
+    updateTabStyles(btnMap, btnList);
     setTimeout(() => map.invalidateSize(), 100);
   });
 }
