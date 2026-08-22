@@ -2,6 +2,8 @@
 // filename: app.js
 //
 
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw0utLhV6H8G0FbGdwIiM7Jk8L4u1QcXtpgiJLkQL5pFccAa-RTol-tRvl4_Oco_x1XeQ/exec';
+
 // Initiera kartan centrerad på Sverige (zoom 5 visar hela landet)
 const map = L.map('map', { zoomControl: false }).setView([62.0, 15.0], 5);
 
@@ -199,22 +201,58 @@ document.getElementById('btn-save-confirm').addEventListener('click', () => {
   const notes = document.getElementById('input-notes').value || 'Inga anteckningar angivna.';
 
   const newPlace = {
+    id: 'marker_' + Date.now(),
     lat: currentCoords[0],
     lng: currentCoords[1],
     title: title,
     category: selectedCategory.name,
-    distance: "0 km",
-    bearing: "Här",
     description: `${selectedAmount}. ${notes}`,
-    imageUrl: "https://images.unsplash.com/photo-1632731881691-645b2069b917?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMTkyMXwwfDF8c2VhcmNofDExfHxtdXNocm9vbXMlMjBmb3Jlc3R8ZW58MHx8fHwxNjMyNzM4ODY2&ixlib=rb-1.2.1&q=80&w=400",
-    altitude: 0,
     timestamp: new Date().toISOString().split('T')[0]
   };
 
+  // 1. Visa markören på kartan direkt
   const marker = addPlaceToMap(newPlace);
   modal.classList.add('hidden');
   marker.openPopup();
+
+  // 2. Skicka till Google Sheets i bakgrunden
+  saveToGoogleSheets(newPlace);
 });
+
+
+
+// Spara nytt fynd till Google Sheets
+async function saveToGoogleSheets(placeData) {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(placeData)
+    });
+    console.log("Sparat till Google Sheets!");
+  } catch (err) {
+    console.error("Kunde inte spara till Sheets:", err);
+  }
+}
+
+// Ladda sparade fynd från Google Sheets när appen startar
+async function loadFromGoogleSheets() {
+  try {
+    const response = await fetch(SCRIPT_URL);
+    const places = await response.json();
+    
+    places.forEach(place => {
+      addPlaceToMap(place);
+    });
+  } catch (err) {
+    console.error("Kunde inte ladda från Sheets:", err);
+  }
+}
+
+// Ladda in sparade markörer direkt vid start
+loadFromGoogleSheets();
+
 
 // -----------------------------------------------------------------
 // 4. Markör- & Popup-hantering
