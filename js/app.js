@@ -33,16 +33,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 1. Ladda först det som finns sparat lokalt i IndexedDB
     const stored = await getAllMarkers();
-    stored.forEach(place => addPlaceToMap(place));
+    if (stored && stored.length > 0) {
+      savedPlaces = stored;
+      savedPlaces.forEach(place => addPlaceToMap(place));
+    }
 
     // 2. Hämta befintliga poster från Google Sheets (Kod.gs)
     if (navigator.onLine) {
       const res = await fetch(SCRIPT_URL);
       const remoteData = await res.json();
       
-      if (Array.isArray(remoteData)) {
+      if (Array.isArray(remoteData) && remoteData.length > 0) {
+        // Töm lokala listan och fyll med färsk data från kalkylarket
+        savedPlaces = [];
+        
         for (const item of remoteData) {
-          if (!item.id || !item.lat || !item.lng) continue;
+          if (!item.id || item.lat === undefined || item.lng === undefined) continue;
 
           const formatted = {
             id: String(item.id),
@@ -57,16 +63,22 @@ document.addEventListener('DOMContentLoaded', async () => {
           };
           
           await saveMarker(formatted);
+          savedPlaces.push(formatted);
           addPlaceToMap(formatted);
         }
       }
     }
+
+    // Uppdatera räknaren och rita ut listvyn med den inlästa datan
+    updateMarkerCount();
+    renderListView();
 
     await syncPendingMarkers();
   } catch (err) {
     console.error("Fel vid laddning av markörer:", err);
   }
 });
+
 
 
 
@@ -317,7 +329,11 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
 
     const savedMarker = await saveMarker(newPlace);
     const markerToMap = savedMarker || newPlace;
+
+    savedPlaces.push(markerToMap); // Lägg till i listan
     const marker = addPlaceToMap(markerToMap);
+    updateMarkerCount();           // Uppdatera räknaren
+    renderListView();              // Uppdatera listvyn
     
     currentPhotoBase64 = null;
     document.getElementById('photo-preview-container')?.classList.add('hidden');
@@ -327,6 +343,7 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
     modal.classList.add('hidden');
 
     if (marker) marker.openPopup();
+
   } catch (err) {
     console.error("Fel vid sparande av markör:", err);
     alert(`Kunde inte spara:\n${err?.message || err}`);
