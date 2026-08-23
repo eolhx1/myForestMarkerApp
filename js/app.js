@@ -419,24 +419,62 @@ function updateMarkerCount() {
 }
 
 function addPlaceToMap(place) {
-  const placeId = String(place.id || ('marker_' + Date.now()));
-  place.id = placeId;
-
-  if (!markerMap.has(placeId)) {
-    const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
-    markerMap.set(placeId, marker);
-    marker.bindPopup(createPopupContent(place, placeId));
+  // Kontrollera om markören redan finns på kartan
+  if (markersMap[place.id]) {
+    map.removeLayer(markersMap[place.id]);
   }
 
-  if (!savedPlaces.some(p => String(p.id) === placeId)) {
-    savedPlaces.push(place);
-  }
+  const iconEmoji = getCategoryIcon(place);
 
-  updateMarkerCount();
-  renderListView();
+  // Skapa dynamisk ikon baserat på kategorin
+  const customIcon = L.divIcon({
+    className: 'custom-map-pin',
+    html: `
+      <div style="
+        background: white;
+        border: 2px solid #059669;
+        border-radius: 50%;
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      ">
+        ${iconEmoji}
+      </div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -18]
+  });
+
+  const marker = L.marker([Number(place.lat), Number(place.lng)], { icon: customIcon });
   
-  return markerMap.get(placeId);
+  marker.bindPopup(createPopupContent(place));
+  marker.addTo(map);
+
+  markersMap[place.id] = marker;
 }
+
+
+// Hjälpfunktion för att välja ikon utifrån kategori/titel
+function getCategoryIcon(place) {
+  const cat = (place.category || place.categoryGroup || place.title || '').toLowerCase();
+  
+  if (cat.includes('tält') || cat.includes('läger') || cat.includes('vindskydd')) return '⛺';
+  if (cat.includes('kantarell') || cat.includes('svamp')) return '🍄';
+  if (cat.includes('bär') || cat.includes('blåbär') || cat.includes('lingon')) return '🫐';
+  if (cat.includes('kupa') || cat.includes('bi') || cat.includes('bigård')) return '🐝';
+  if (cat.includes('jakt') || cat.includes('pass')) return '🦌';
+  if (cat.includes('fiske') || cat.includes('sjö')) return '🐟';
+  if (cat.includes('parkering') || cat.includes('bil')) return '🅿️';
+
+  return '📍'; // Standardnålen om inget matchar
+}
+
+
 
 // -----------------------------------------------------------------
 // 6. GPS-spårning
