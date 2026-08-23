@@ -173,7 +173,7 @@ function renderCategoryGrid() {
   const grid = document.getElementById('category-grid');
   if (!grid) return;
   grid.innerHTML = CATEGORIES.map(cat => {
-    const isSelected = cat.id === selectedCategory.id;
+    const isSelected = selectedCategory && cat.id === selectedCategory.id;
     return `
       <button data-id="${cat.id}" type="button" class="category-btn p-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition ${isSelected ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}">
         <div class="flex items-center justify-center h-7 w-7">
@@ -187,8 +187,9 @@ function renderCategoryGrid() {
   document.querySelectorAll('.category-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const catId = e.currentTarget.getAttribute('data-id');
-      selectedCategory = CATEGORIES.find(c => c.id === catId);
-      document.getElementById('input-title').value = selectedCategory.name;
+      selectedCategory = CATEGORIES.find(c => c.id === catId) || CATEGORIES[0];
+      const titleInput = document.getElementById('input-title');
+      if (titleInput) titleInput.value = selectedCategory.name;
       renderCategoryGrid();
     });
   });
@@ -214,6 +215,8 @@ document.getElementById('btn-mark')?.addEventListener('click', () => {
     const accText = `±${Math.round(currentAccuracy)}m`;
     document.getElementById('modal-accuracy').innerText = accText;
     document.getElementById('modal-footer-gps').innerText = accText;
+
+    if (!selectedCategory) selectedCategory = CATEGORIES[0];
     document.getElementById('input-title').value = selectedCategory.name;
     
     renderCategoryGrid();
@@ -228,106 +231,44 @@ document.getElementById('modal-close')?.addEventListener('click', () => modal.cl
 // -----------------------------------------------------------------
 // 4. Hantering & Synkronisering
 // -----------------------------------------------------------------
-document.getElementById('btn-save-confirm')?.addEventListener('click', async () => {
-  const title = document.getElementById('input-title').value || selectedCategory.name;
-  const notes = document.getElementById('input-notes').value || 'Inga anteckningar angivna.';
+document.getElementById('btn-save-confirm')?.addEventListener('click', async (e) => {
+  e.preventDefault();
 
-  const newPlace = {
-    id: 'marker_' + Date.now(),
-    lat: currentCoords[0],
-    lng: currentCoords[1],
-    title: title,
-    categoryGroup: selectedCategory.group,
-    category: selectedCategory.group,
-    description: `${selectedAmount}. ${notes}`,
-    photo: currentPhotoBase64
-  };
-
-  currentPhotoBase64 = null;
-  document.getElementById('photo-preview-container')?.classList.add('hidden');
-
-  const savedMarker = await saveMarker(newPlace);
-  const marker = addPlaceToMap(savedMarker);
-  modal.classList.add('hidden');
-  marker.openPopup();
-});
-
-async function deleteFromGoogleSheets(placeId) {
   try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'delete', id: placeId })
-    });
-  } catch (err) {
-    console.error("Kunde inte ta bort från Sheets:", err);
-  }
-}
+    const title = document.getElementById('input-title')?.value || selectedCategory?.name || 'Skogsfynd';
+    const notes = document.getElementById('input-notes')?.value || 'Inga anteckningar angivna.';
+    const catGroup = selectedCategory?.group || selectedCategory?.name || 'Övrigt';
 
-window.removeCurrentMarker = async function(placeId) {
-  const marker = markerMap.get(placeId);
-  if (marker && confirm("Vill du ta bort denna markör?")) {
-    map.removeLayer(marker);
-    savedPlaces = savedPlaces.filter(p => String(p.id) !== String(placeId));
-    markerMap.delete(placeId);
+    const newPlace = {
+      id: 'marker_' + Date.now(),
+      lat: currentCoords ? currentCoords[0] : 0,
+      lng: currentCoords ? currentCoords[1] : 0,
+      title: title,
+      categoryGroup: catGroup,
+      category: catGroup,
+      description: `${selectedAmount}. ${notes}`,
+      photo: currentPhotoBase64 || null,
+      timestamp: new Date().toISOString()
+    };
+
+    // Spara lokalt i IndexedDB
+    const savedMarker = await saveMarker(newPlace);
     
-    await deleteMarker(placeId);
-    updateMarkerCount();
-    renderListView();
+    // Rita ut på kartan
+    const marker = addPlaceToMap(savedMarker || newPlace);
+    
+    // Återställ formulär & stäng modal
+    currentPhotoBase64 = null;
+    document.getElementById('photo-preview-container')?.classList.add('hidden');
+    document.getElementById('input-notes').value = '';
+    modal.classList.add('hidden');
 
-    if (navigator.onLine) {
-      deleteFromGoogleSheets(placeId);
-    }
+    if (marker) marker.openPopup();
+  } catch (err) {
+    console.error("Fel vid sparande av markör:", err);
+    alert("Kunde inte spara markören. Se konsolen för detaljer.");
   }
-};
-
-async function initAppStorage() {
-  await initDB();
-  const localPlaces = await getAllMarkers();
-  localPlaces.forEach(place => addPlaceToMap(place));
-
-  if (navigator.onLine) {
-    try {
-      const response = await fetch(SCRIPT_URL);
-      const data = await response.json();
-      
-      const remotePlaces = Array.isArray(data) ? data : [];
-      const remoteIds = new Set(remotePlaces.map(p => String(p.id)));
-
-      for (const localPlace of localPlaces) {
-        if (localPlace.syncStatus === 'synced' && !remoteIds.has(String(localPlace.id))) {
-          const marker = markerMap.get(String(localPlace.id));
-          if (marker) {
-            map.removeLayer(marker);
-            markerMap.delete(String(localPlace.id));
-          }
-          await deleteMarker(localPlace.id);
-        }
-      }
-
-      savedPlaces = [];
-      for (const rPlace of remotePlaces) {
-        rPlace.syncStatus = 'synced';
-        await saveMarker(rPlace);
-        addPlaceToMap(rPlace);
-      }
-
-      if (remotePlaces.length === 0 && localPlaces.length === 0) {
-        markerMap.forEach(marker => map.removeLayer(marker));
-        markerMap.clear();
-      }
-
-      updateMarkerCount();
-      renderListView();
-
-    } catch (err) {
-      console.warn("Kunde inte synka med Sheets:", err);
-    }
-  }
-}
-
-initAppStorage();
+});
 
 // -----------------------------------------------------------------
 // 5. Markör & Kartvisning
