@@ -235,17 +235,21 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
   e.preventDefault();
 
   try {
-    // Säkerställ att IndexedDB är redo
     await initDB();
 
     const title = document.getElementById('input-title')?.value || selectedCategory?.name || 'Skogsfynd';
     const notes = document.getElementById('input-notes')?.value || 'Inga anteckningar angivna.';
     const catGroup = selectedCategory?.group || selectedCategory?.name || 'Övrigt';
 
+    const latVal = currentCoords ? currentCoords[0] : 0;
+    const lngVal = currentCoords ? currentCoords[1] : 0;
+
     const newPlace = {
       id: 'marker_' + Date.now(),
-      lat: currentCoords ? currentCoords[0] : 0,
-      lng: currentCoords ? currentCoords[1] : 0,
+      lat: latVal,
+      lng: lngVal,
+      latitude: latVal,       // Mappar mot Latitude i Google Sheets
+      longitude: lngVal,     // Mappar mot Longitude i Google Sheets
       title: title,
       categoryGroup: catGroup,
       category: catGroup,
@@ -254,14 +258,10 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
       timestamp: new Date().toISOString()
     };
 
-    // Spara lokalt i IndexedDB
     const savedMarker = await saveMarker(newPlace);
-    
-    // Rita ut på kartan (använd savedMarker om den returnerades, annars newPlace)
     const markerToMap = savedMarker || newPlace;
     const marker = addPlaceToMap(markerToMap);
     
-    // Återställ formulär & stäng modal
     currentPhotoBase64 = null;
     document.getElementById('photo-preview-container')?.classList.add('hidden');
     const notesInput = document.getElementById('input-notes');
@@ -272,10 +272,10 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
     if (marker) marker.openPopup();
   } catch (err) {
     console.error("Fel vid sparande av markör:", err);
-    // Visar det faktiska felet på plattan så vi ser vad som spökar:
     alert(`Kunde inte spara:\n${err?.message || err}`);
   }
 });
+
 
 
 // -----------------------------------------------------------------
