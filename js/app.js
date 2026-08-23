@@ -235,6 +235,9 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
   e.preventDefault();
 
   try {
+    // Säkerställ att IndexedDB är redo
+    await initDB();
+
     const title = document.getElementById('input-title')?.value || selectedCategory?.name || 'Skogsfynd';
     const notes = document.getElementById('input-notes')?.value || 'Inga anteckningar angivna.';
     const catGroup = selectedCategory?.group || selectedCategory?.name || 'Övrigt';
@@ -254,21 +257,26 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
     // Spara lokalt i IndexedDB
     const savedMarker = await saveMarker(newPlace);
     
-    // Rita ut på kartan
-    const marker = addPlaceToMap(savedMarker || newPlace);
+    // Rita ut på kartan (använd savedMarker om den returnerades, annars newPlace)
+    const markerToMap = savedMarker || newPlace;
+    const marker = addPlaceToMap(markerToMap);
     
     // Återställ formulär & stäng modal
     currentPhotoBase64 = null;
     document.getElementById('photo-preview-container')?.classList.add('hidden');
-    document.getElementById('input-notes').value = '';
+    const notesInput = document.getElementById('input-notes');
+    if (notesInput) notesInput.value = '';
+    
     modal.classList.add('hidden');
 
     if (marker) marker.openPopup();
   } catch (err) {
     console.error("Fel vid sparande av markör:", err);
-    alert("Kunde inte spara markören. Se konsolen för detaljer.");
+    // Visar det faktiska felet på plattan så vi ser vad som spökar:
+    alert(`Kunde inte spara:\n${err?.message || err}`);
   }
 });
+
 
 // -----------------------------------------------------------------
 // 5. Markör & Kartvisning
