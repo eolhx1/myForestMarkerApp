@@ -27,28 +27,29 @@
 <body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
 
 <!-- Header -->
-<header class="p-3 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm">
-    <span class="inline-flex items-center gap-1 text-xs bg-slate-100 px-2.5 py-1.5 rounded-full border border-slate-200 font-medium text-slate-600">
-        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        <span id="gps-accuracy-badge">Söker GPS...</span>
+<header class="grid grid-cols-3 items-center px-4 py-2 bg-white border-b border-slate-200">
+  <!-- Vänster: GPS-badge -->
+  <div class="justify-self-start">
+    <span id="gps-accuracy-badge" class="min-w-[4rem] inline-block text-center text-xs bg-slate-100 px-2.5 py-1 rounded-full text-slate-600 font-semibold border border-slate-200">
+      ±5m
     </span>
+  </div>
 
-    <div class="flex items-center gap-2">
-        <div class="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-xl shadow">
-            🍄
-        </div>
-        <div>
-            <h1 class="font-bold text-lg leading-tight">Skogsmarkören</h1>
-            <p class="text-xs text-slate-500">
-                GPS • Google Sheets & Earth
-            </p>
-        </div>
+  <!-- Mitten: Logga & Rubrik -->
+  <div class="justify-self-center flex items-center gap-2">
+    <span class="text-2xl">🍄</span>
+    <div>
+      <h1 class="font-bold text-slate-900 leading-none">Skogsmarkören</h1>
+      <p class="text-[10px] text-slate-500 font-medium">GPS • Google Sheets & Earth</p>
     </div>
+  </div>
 
-    <a href="https://earth.google.com/web/" target="_blank" class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-full font-semibold">
-        🌐 Earth
-    </a>
+  <!-- Höger: Earth/Knapp -->
+  <div class="justify-self-end">
+    <!-- Din högra knapp eller tom div -->
+  </div>
 </header>
+
 
 <!-- Controls -->
 <div class="p-2 bg-slate-100 flex items-center gap-2">

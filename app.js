@@ -373,40 +373,27 @@ async function initAppStorage() {
       const response = await fetch(SCRIPT_URL);
       const data = await response.json();
       
-      // Säkerställ att vi fick en array tillbaka
       const remotePlaces = Array.isArray(data) ? data : [];
       const remoteIds = new Set(remotePlaces.map(p => String(p.id)));
 
       // A. Rensa lokala platser som inte längre finns i Sheets
       for (const localPlace of localPlaces) {
         if (localPlace.synced && !remoteIds.has(String(localPlace.id))) {
-          // Ta bort Leaflet-markören från kartan
           const marker = markerMap.get(String(localPlace.id));
           if (marker) {
             map.removeLayer(marker);
             markerMap.delete(String(localPlace.id));
           }
-          
-          // Ta bort från IndexedDB
           await deletePlaceLocally(localPlace.id);
         }
       }
 
-      // B. Töm den lokala minnesarrayen och lägg till det som faktiskt finns kvar
+      // B. Synka Sheets-data med lokal lagring och karta
       savedPlaces = [];
-      
-      // Om det finns poster i Sheets, spara och rita ut dem
       for (const rPlace of remotePlaces) {
         rPlace.synced = true;
         await savePlaceLocally(rPlace);
-        
-        // Rita bara ut på kartan om den inte redan finns där
-        if (!markerMap.has(String(rPlace.id))) {
-          const marker = L.marker([rPlace.lat, rPlace.lng], { icon: mushroomIcon }).addTo(map);
-          markerMap.set(String(rPlace.id), marker);
-          marker.bindPopup(createPopupContent(rPlace, String(rPlace.id)));
-        }
-        savedPlaces.push(rPlace);
+        addPlaceToMap(rPlace);
       }
 
       // Om Sheets var helt tomt, rensa alla kvarvarande markörer från kartan
@@ -423,8 +410,6 @@ async function initAppStorage() {
     }
   }
 }
-
-
 
 window.addEventListener('online', async () => {
   const places = await getLocalPlaces();
@@ -501,7 +486,6 @@ function addPlaceToMap(place) {
   return markerMap.get(placeId);
 }
 
-
 // -----------------------------------------------------------------
 // 6. GPS-spårning
 // -----------------------------------------------------------------
@@ -547,7 +531,6 @@ function updatePosition(position, autoCenter = false) {
     });
   }
 }
-
 
 if ('geolocation' in navigator) {
   let initialCenter = false;
