@@ -1,13 +1,8 @@
-// 
-// filename: app.js
-//
-
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw0utLhV6H8G0FbGdwIiM7Jk8L4u1QcXtpgiJLkQL5pFccAa-RTol-tRvl4_Oco_x1XeQ/exec';
 
-// Initiera kartan centrerad på Sverige (zoom 5 visar hela landet)
+// Initiera kartan centrerad på Sverige
 const map = L.map('map', { zoomControl: false }).setView([62.0, 15.0], 5);
 
-// Tvinga Leaflet att räkna om containerns storlek så att kartan fyller hela skärmen
 setTimeout(() => {
   map.invalidateSize();
 }, 100);
@@ -32,7 +27,6 @@ const tileLayers = {
   })
 };
 
-// Starta med Skogstopo som aktivt lager
 let activeLayer = tileLayers.topo;
 activeLayer.addTo(map);
 
@@ -111,7 +105,7 @@ styleSheet.innerText = `
 document.head.appendChild(styleSheet);
 
 // -----------------------------------------------------------------
-// 3. Tillstånd & Kategorier
+// 3. Tillstånd, Kategorier & Bildkomprimering
 // -----------------------------------------------------------------
 const categories = [
   { id: 'gula-kantareller', name: 'Gula kantareller', icon: '🍄' },
@@ -132,12 +126,59 @@ const categories = [
 
 let selectedCategory = categories[0];
 let selectedAmount = 'Rikligt med fynd';
-let savedPlaces = []; // Sparar rådata om alla platser
+let savedPlaces = [];
 let markerMap = new Map();
 let userPositionMarker = null;
 let userAccuracyCircle = null;
 let currentCoords = null;
 let currentAccuracy = 0;
+let currentPhotoBase64 = null;
+
+// Lyssna på bildinmatning och komprimera
+document.getElementById('input-photo')?.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 800;
+      const MAX_HEIGHT = 800;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+      } else {
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      currentPhotoBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+      const preview = document.getElementById('photo-preview');
+      const previewContainer = document.getElementById('photo-preview-container');
+      if (preview && previewContainer) {
+        preview.src = currentPhotoBase64;
+        previewContainer.classList.remove('hidden');
+      }
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+});
 
 function renderCategoryGrid() {
   const grid = document.getElementById('category-grid');
@@ -193,311 +234,8 @@ document.getElementById('btn-mark').addEventListener('click', () => {
 
 document.getElementById('modal-close').addEventListener('click', () => modal.classList.add('hidden'));
 
-document.getElementById('btn-save-confirm').addEventListener('click', () => {
-  const title = document.getElementById('input-title').value || selectedCategory.name;
-  const notes = document.getElementById('input-notes').value || 'Inga anteckningar angivna.';
-
-  const newPlace = {
-    id: 'marker_' + Date.now(),
-    lat: currentCoords[0],
-    lng: currentCoords[1],
-    title: title,
-    category: selectedCategory.name,
-    description: `${selectedAmount}. ${notes}`,
-    timestamp: new Date().toISOString().split('T')[0]
-  };
-
-  const marker = addPlaceToMap(newPlace);
-  modal.classList.add('hidden');
-  marker.openPopup();
-
-  saveToGoogleSheets(newPlace);
-});
-
-async function saveToGoogleSheets(placeData) {
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(placeData)
-    });
-    console.log("Skickat till Google Sheets!");
-  } catch (err) {
-    console.error("Kunde inte spara till Sheets:", err);
-  }
-}
-
-async function loadFromGoogleSheets() {
-  try {
-    const response = await fetch(SCRIPT_URL);
-    const places = await response.json();
-    
-    places.forEach(place => {
-      addPlaceToMap(place);
-    });
-  } catch (err) {
-    console.error("Kunde inte ladda från Sheets:", err);
-  }
-}
-
-loadFromGoogleSheets();
-
 // -----------------------------------------------------------------
-// 4. Markör- & Popup-hantering
-// -----------------------------------------------------------------
-function createPopupContent(place, placeId) {
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
-  const googleEarthUrl = `https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r`;
-
-  const latNum = Number(place.lat) || 0;
-  const lngNum = Number(place.lng) || 0;
-
-  return `
-    <div class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200" style="width: 280px; max-width: calc(100vw - 40px);">
-      <div class="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="font-bold text-base text-emerald-900 leading-tight pr-2">${place.title}</h3>
-        <button onclick="window.removeCurrentMarker('${placeId}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">🗑️</button>
-      </div>
-      <div class="px-3 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold">
-        <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">${place.category}</span>
-      </div>
-      <div class="px-3 py-2 text-xs text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
-        "${place.description}"
-      </div>
-      <div class="p-3 space-y-1 text-xs text-slate-700">
-        <div>📍 <span class="font-mono text-slate-600">${latNum.toFixed(5)}, ${lngNum.toFixed(5)}</span></div>
-        <div>🕐 <strong>Tid:</strong> ${place.timestamp}</div>
-      </div>
-      <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex gap-2">
-        <a href="${googleEarthUrl}" target="_blank" class="flex-1 text-center bg-blue-50 text-blue-700 border border-blue-200 py-1.5 rounded-xl text-xs font-semibold">🌐 Earth 3D</a>
-        <a href="${googleMapsUrl}" target="_blank" class="flex-1 text-center bg-emerald-50 text-emerald-700 border border-emerald-200 py-1.5 rounded-xl text-xs font-semibold">🗺️ Maps</a>
-      </div>
-    </div>
-  `;
-}
-
-async function deleteFromGoogleSheets(placeId) {
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'delete', id: placeId })
-    });
-    console.log("Borttagning skickad till Google Sheets för ID:", placeId);
-  } catch (err) {
-    console.error("Kunde inte ta bort från Sheets:", err);
-  }
-}
-
-window.removeCurrentMarker = function(placeId) {
-  const marker = markerMap.get(placeId);
-  if (marker && confirm("Vill du ta bort denna markör?")) {
-    map.removeLayer(marker);
-    savedPlaces = savedPlaces.filter(p => String(p.id) !== String(placeId));
-    markerMap.delete(placeId);
-    updateMarkerCount();
-    renderListView(); // Uppdatera även listan om den är öppen
-    
-    deleteFromGoogleSheets(placeId);
-  }
-};
-
-function updateMarkerCount() {
-  document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
-}
-
-function addPlaceToMap(place) {
-  const placeId = String(place.id || ('marker_' + Date.now()));
-  place.id = placeId;
-
-  const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
-  markerMap.set(placeId, marker);
-  marker.bindPopup(createPopupContent(place, placeId));
-  
-  // Spara datan i vår plats-array
-  savedPlaces.push(place);
-  updateMarkerCount();
-  renderListView(); // Uppdatera listvyn när ny plats läggs till
-  return marker;
-}
-
-// -----------------------------------------------------------------
-// 5. GPS-spårning
-// -----------------------------------------------------------------
-function updatePosition(position, autoCenter = false) {
-  const { latitude, longitude, accuracy } = position.coords;
-  currentCoords = [latitude, longitude];
-  currentAccuracy = accuracy;
-
-  const accText = `±${Math.round(accuracy)}m`;
-  const badge = document.getElementById('gps-accuracy-badge');
-  const footer = document.getElementById('gps-accuracy-footer');
-  if (badge) badge.innerText = accText;
-  if (footer) footer.innerText = `GPS: ${accText}`;
-
-  if (userPositionMarker && userAccuracyCircle) {
-    userPositionMarker.setLatLng([latitude, longitude]);
-    userAccuracyCircle.setLatLng([latitude, longitude]);
-    userAccuracyCircle.setRadius(accuracy);
-  } else {
-    userAccuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color: '#3b82f6', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.15 }).addTo(map);
-    userPositionMarker = L.marker([latitude, longitude], { icon: myLocationIcon, zIndexOffset: 1000 }).addTo(map);
-  }
-
-  if (autoCenter) map.flyTo([latitude, longitude], 16, { 
-      duration: 1.5,
-      easeLinearity: 0.25 
-  });
-}
-
-if ('geolocation' in navigator) {
-  let initialCenter = false;
-  navigator.geolocation.watchPosition(
-    (pos) => { updatePosition(pos, !initialCenter); initialCenter = true; },
-    (err) => console.warn(err.message),
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
-  );
-}
-
-document.getElementById('btn-recenter').addEventListener('click', () => {
-  if (currentCoords) map.flyTo(currentCoords, 16, { animate: true, duration: 1.5 });
-});
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
-}
-
-// -----------------------------------------------------------------
-// 6. Listvy & Avståndsberäkning
-// -----------------------------------------------------------------
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371; // Jordens radie i km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const d = R * c;
-  return d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1)} km`;
-}
-
-function renderListView() {
-  const container = document.getElementById('list-container');
-  if (!container) return;
-
-  if (savedPlaces.length === 0) {
-    container.innerHTML = `
-      <div class="p-8 text-center text-slate-400">
-        <p>Inga sparade skogsmarkörer än.</p>
-      </div>`;
-    return;
-  }
-
-  container.innerHTML = savedPlaces.map(item => {
-    const lat = Number(item.lat);
-    const lng = Number(item.lng);
-    
-    let distText = '';
-    if (currentCoords) {
-      const dist = calculateDistance(currentCoords[0], currentCoords[1], lat, lng);
-      if (dist) distText = `🧭 ${dist} bort`;
-    }
-
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-    const earthUrl = `https://earth.google.com/web/@${lat},${lng},0a,500d,35y,0h,0t,0r`;
-
-    return `
-      <div class="bg-white rounded-3xl p-4 mb-4 border border-slate-100 shadow-sm space-y-3">
-        <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
-          <span class="bg-amber-100 text-amber-900 px-3 py-1 rounded-full flex items-center gap-1">
-            📍 ${item.category || 'Naturfynd'}
-          </span>
-          ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>` : ''}
-          <span class="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full ml-auto border border-emerald-100">
-            🍃 Sheets
-          </span>
-        </div>
-
-        <div>
-          <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
-          ${item.description ? `
-            <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
-              "${item.description}"
-            </div>
-          ` : ''}
-        </div>
-
-        <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
-          <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
-          <span>${item.timestamp || ''}</span>
-        </div>
-
-        <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
-          <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
-            🌐 Earth
-          </a>
-          <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
-            🗺️ Maps
-          </a>
-          <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
-            🗑️
-          </button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-// -----------------------------------------------------------------
-// Hantering av flikväxling (Karta vs Lista)
-// -----------------------------------------------------------------
-const btnList = document.getElementById('btn-show-list');
-const btnMap = document.getElementById('btn-show-map');
-
-function updateTabStyles(activeBtn, inactiveBtn) {
-  if (!activeBtn || !inactiveBtn) return;
-
-  // Aktiv knapp (Vit bakgrund, mörkgrön text, rundade hörn)
-  activeBtn.style.backgroundColor = '#ffffff';
-  activeBtn.style.color = '#065f46';
-  activeBtn.style.borderRadius = '0.75rem'; // 12px runda hörn (rounded-xl)
-  activeBtn.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-  activeBtn.style.fontWeight = '600';
-
-  // Inaktiv knapp (Genomskinlig bakgrund, grå text, rundade hörn)
-  inactiveBtn.style.backgroundColor = 'transparent';
-  inactiveBtn.style.color = '#475569';
-  inactiveBtn.style.borderRadius = '0.75rem';
-  inactiveBtn.style.boxShadow = 'none';
-  inactiveBtn.style.fontWeight = '500';
-}
-
-if (btnList) {
-  btnList.addEventListener('click', () => {
-    document.getElementById('map-view')?.classList.add('hidden');
-    document.getElementById('list-view')?.classList.remove('hidden');
-    
-    updateTabStyles(btnList, btnMap);
-    renderListView();
-  });
-}
-
-if (btnMap) {
-  btnMap.addEventListener('click', () => {
-    document.getElementById('list-view')?.classList.add('hidden');
-    document.getElementById('map-view')?.classList.remove('hidden');
-    
-    updateTabStyles(btnMap, btnList);
-    setTimeout(() => map.invalidateSize(), 100);
-  });
-}
-
-// -----------------------------------------------------------------
-// IndexedDB Databashantering (Offline-first)
+// 4. IndexedDB & Synkronisering
 // -----------------------------------------------------------------
 const DB_NAME = 'SkogsmarkorenDB';
 const DB_VERSION = 1;
@@ -550,9 +288,6 @@ async function deletePlaceLocally(id) {
   });
 }
 
-
-
-// Spara plats (Lokalt först, sen Sheets om online)
 document.getElementById('btn-save-confirm').addEventListener('click', async () => {
   const title = document.getElementById('input-title').value || selectedCategory.name;
   const notes = document.getElementById('input-notes').value || 'Inga anteckningar angivna.';
@@ -564,19 +299,19 @@ document.getElementById('btn-save-confirm').addEventListener('click', async () =
     title: title,
     category: selectedCategory.name,
     description: `${selectedAmount}. ${notes}`,
+    photo: currentPhotoBase64,
     timestamp: new Date().toISOString().split('T')[0],
     synced: false
   };
 
-  // 1. Spara lokalt i IndexedDB direkt
+  currentPhotoBase64 = null;
+  document.getElementById('photo-preview-container')?.classList.add('hidden');
+
   await savePlaceLocally(newPlace);
-  
-  // 2. Visa på kartan och i listan
   const marker = addPlaceToMap(newPlace);
   modal.classList.add('hidden');
   marker.openPopup();
 
-  // 3. Försök synka till Google Sheets
   if (navigator.onLine) {
     syncPlaceToSheets(newPlace);
   }
@@ -590,17 +325,26 @@ async function syncPlaceToSheets(placeData) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(placeData)
     });
-    
-    // Markera som synkad lokalt
     placeData.synced = true;
     await savePlaceLocally(placeData);
-    console.log("Synkad till Google Sheets:", placeData.id);
   } catch (err) {
-    console.warn("Kunde inte synka till Sheets just nu (Sparad offline):", err);
+    console.warn("Sparad offline (Kunde inte nå Sheets):", err);
   }
 }
 
-// Ta bort plats lokalt och från Sheets
+async function deleteFromGoogleSheets(placeId) {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'delete', id: placeId })
+    });
+  } catch (err) {
+    console.error("Kunde inte ta bort från Sheets:", err);
+  }
+}
+
 window.removeCurrentMarker = async function(placeId) {
   const marker = markerMap.get(placeId);
   if (marker && confirm("Vill du ta bort denna markör?")) {
@@ -608,26 +352,20 @@ window.removeCurrentMarker = async function(placeId) {
     savedPlaces = savedPlaces.filter(p => String(p.id) !== String(placeId));
     markerMap.delete(placeId);
     
-    // Ta bort lokalt från IndexedDB
     await deletePlaceLocally(placeId);
-    
     updateMarkerCount();
     renderListView();
 
-    // Om online, skicka borttagning till Sheets
     if (navigator.onLine) {
       deleteFromGoogleSheets(placeId);
     }
   }
 };
 
-
 async function initAppStorage() {
-  // Ladda från IndexedDB först (Funkar utan täckning)
   const localPlaces = await getLocalPlaces();
   localPlaces.forEach(place => addPlaceToMap(place));
 
-  // Om vi har internet, hämta eventuella nya rader från Google Sheets
   if (navigator.onLine) {
     try {
       const response = await fetch(SCRIPT_URL);
@@ -646,9 +384,7 @@ async function initAppStorage() {
   }
 }
 
-// Lyssna på när enheten får tillbaka täckning ute i skogen
 window.addEventListener('online', async () => {
-  console.log("Nätverk tillgängligt! Synkar offline-markörer...");
   const places = await getLocalPlaces();
   const unsynced = places.filter(p => !p.synced);
   for (const place of unsynced) {
@@ -656,5 +392,229 @@ window.addEventListener('online', async () => {
   }
 });
 
-// Kör igång lagringen
 initAppStorage();
+
+// -----------------------------------------------------------------
+// 5. Markör & Kartvisning
+// -----------------------------------------------------------------
+function createPopupContent(place, placeId) {
+  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
+  const googleEarthUrl = `https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r`;
+
+  const latNum = Number(place.lat) || 0;
+  const lngNum = Number(place.lng) || 0;
+
+  return `
+    <div class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200" style="width: 280px; max-width: calc(100vw - 40px);">
+      ${place.photo ? `
+        <div class="w-full h-32 overflow-hidden">
+          <img src="${place.photo}" class="w-full h-full object-cover" alt="Skogsbild">
+        </div>
+      ` : ''}
+      <div class="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="font-bold text-base text-emerald-900 leading-tight pr-2">${place.title}</h3>
+        <button onclick="window.removeCurrentMarker('${placeId}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">🗑️</button>
+      </div>
+      <div class="px-3 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold">
+        <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">${place.category}</span>
+      </div>
+      <div class="px-3 py-2 text-xs text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
+        "${place.description}"
+      </div>
+      <div class="p-3 space-y-1 text-xs text-slate-700">
+        <div>📍 <span class="font-mono text-slate-600">${latNum.toFixed(5)}, ${lngNum.toFixed(5)}</span></div>
+        <div>🕐 <strong>Tid:</strong> ${place.timestamp}</div>
+      </div>
+      <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex gap-2">
+        <a href="${googleEarthUrl}" target="_blank" class="flex-1 text-center bg-blue-50 text-blue-700 border border-blue-200 py-1.5 rounded-xl text-xs font-semibold">🌐 Earth 3D</a>
+        <a href="${googleMapsUrl}" target="_blank" class="flex-1 text-center bg-emerald-50 text-emerald-700 border border-emerald-200 py-1.5 rounded-xl text-xs font-semibold">🗺️ Maps</a>
+      </div>
+    </div>
+  `;
+}
+
+function updateMarkerCount() {
+  document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
+}
+
+function addPlaceToMap(place) {
+  const placeId = String(place.id || ('marker_' + Date.now()));
+  place.id = placeId;
+
+  const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
+  markerMap.set(placeId, marker);
+  marker.bindPopup(createPopupContent(place, placeId));
+  
+  savedPlaces.push(place);
+  updateMarkerCount();
+  renderListView();
+  return marker;
+}
+
+// -----------------------------------------------------------------
+// 6. GPS-spårning
+// -----------------------------------------------------------------
+function updatePosition(position, autoCenter = false) {
+  const { latitude, longitude, accuracy } = position.coords;
+  currentCoords = [latitude, longitude];
+  currentAccuracy = accuracy;
+
+  const accText = `±${Math.round(accuracy)}m`;
+  const badge = document.getElementById('gps-accuracy-badge');
+  const footer = document.getElementById('gps-accuracy-footer');
+  if (badge) badge.innerText = accText;
+  if (footer) footer.innerText = `GPS: ${accText}`;
+
+  if (userPositionMarker && userAccuracyCircle) {
+    userPositionMarker.setLatLng([latitude, longitude]);
+    userAccuracyCircle.setLatLng([latitude, longitude]);
+    userAccuracyCircle.setRadius(accuracy);
+  } else {
+    userAccuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color: '#3b82f6', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.15 }).addTo(map);
+    userPositionMarker = L.marker([latitude, longitude], { icon: myLocationIcon, zIndexOffset: 1000 }).addTo(map);
+  }
+
+  if (autoCenter) map.flyTo([latitude, longitude], 16, { 
+      duration: 1.5,
+      easeLinearity: 0.25 
+  });
+}
+
+if ('geolocation' in navigator) {
+  let initialCenter = false;
+  navigator.geolocation.watchPosition(
+    (pos) => { updatePosition(pos, !initialCenter); initialCenter = true; },
+    (err) => console.warn(err.message),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
+  );
+}
+
+document.getElementById('btn-recenter').addEventListener('click', () => {
+  if (currentCoords) map.flyTo(currentCoords, 16, { animate: true, duration: 1.5 });
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+}
+
+// -----------------------------------------------------------------
+// 7. Listvy & Flikväxling
+// -----------------------------------------------------------------
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const d = R * c;
+  return d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1)} km`;
+}
+
+function renderListView() {
+  const container = document.getElementById('list-container');
+  if (!container) return;
+
+  if (savedPlaces.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-slate-400">
+        <p>Inga sparade skogsmarkörer än.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = savedPlaces.map(item => {
+    const lat = Number(item.lat);
+    const lng = Number(item.lng);
+    
+    let distText = '';
+    if (currentCoords) {
+      const dist = calculateDistance(currentCoords[0], currentCoords[1], lat, lng);
+      if (dist) distText = `🧭 ${dist} bort`;
+    }
+
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    const earthUrl = `https://earth.google.com/web/@${lat},${lng},0a,500d,35y,0h,0t,0r`;
+
+    return `
+      <div class="bg-white rounded-3xl p-4 mb-4 border border-slate-100 shadow-sm space-y-3">
+        ${item.photo ? `
+          <div class="w-full h-40 rounded-2xl overflow-hidden mb-2">
+            <img src="${item.photo}" class="w-full h-full object-cover" alt="Skogsbild">
+          </div>
+        ` : ''}
+
+        <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
+          <span class="bg-amber-100/80 text-amber-900 px-3 py-1 rounded-full font-semibold text-xs inline-flex items-center gap-1 border border-amber-200/50">
+            📍 ${item.category || 'Naturfynd'}
+          </span>
+          ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>` : ''}
+        </div>
+
+        <div>
+          <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
+          ${item.description ? `
+            <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
+              "${item.description}"
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
+          <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+          <span>${item.timestamp || ''}</span>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
+          <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
+            🌐 Earth
+          </a>
+          <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
+            🗺️ Maps
+          </a>
+          <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+const btnList = document.getElementById('btn-show-list');
+const btnMap = document.getElementById('btn-show-map');
+
+function updateTabStyles(activeBtn, inactiveBtn) {
+  if (!activeBtn || !inactiveBtn) return;
+  activeBtn.style.backgroundColor = '#ffffff';
+  activeBtn.style.color = '#065f46';
+  activeBtn.style.borderRadius = '0.75rem';
+  activeBtn.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+  activeBtn.style.fontWeight = '600';
+
+  inactiveBtn.style.backgroundColor = 'transparent';
+  inactiveBtn.style.color = '#475569';
+  inactiveBtn.style.borderRadius = '0.75rem';
+  inactiveBtn.style.boxShadow = 'none';
+  inactiveBtn.style.fontWeight = '500';
+}
+
+if (btnList) {
+  btnList.addEventListener('click', () => {
+    document.getElementById('map-view')?.classList.add('hidden');
+    document.getElementById('list-view')?.classList.remove('hidden');
+    updateTabStyles(btnList, btnMap);
+    renderListView();
+  });
+}
+
+if (btnMap) {
+  btnMap.addEventListener('click', () => {
+    document.getElementById('list-view')?.classList.add('hidden');
+    document.getElementById('map-view')?.classList.remove('hidden');
+    updateTabStyles(btnMap, btnList);
+    setTimeout(() => map.invalidateSize(), 100);
+  });
+}
