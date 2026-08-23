@@ -1,113 +1,113 @@
 //
-// filename: db.js 
-//
-// offline-lagring och en automatisk kö
+// filename: db.js
 //
 
 import { SCRIPT_URL } from './config.js';
 
-const DB_NAME = 'SkogsmarkorenDB';
-const DB_VERSION = 1;
+const DB_NAME = 'ForestMapDB';
+const DB_VERSION = 2; // Höjt versionsnummer tvingar webbläsaren att skapa tabellen 'markers'
+const STORE_NAME = 'markers';
+
 let db = null;
 
-export async function initDB() {
+export function initDB() {
   return new Promise((resolve, reject) => {
+    if (db) {
+      resolve(db);
+      return;
+    }
+
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('markers')) {
-        const store = db.createObjectStore('markers', { keyPath: 'id' });
-        store.createIndex('syncStatus', 'syncStatus', { unique: false });
-      }
+
+    request.onerror = (e) => {
+      console.error("IndexedDB-fel:", e.target.error);
+      reject(e.target.error);
     };
+
     request.onsuccess = (e) => {
       db = e.target.result;
       resolve(db);
     };
-    request.onerror = (e) => reject(e);
-  });
-}
 
-// Spara ny markör lokalt och gör försök att synka
-export async function saveMarker(markerData) {
-  const marker = {
-    ...markerData,
-    syncStatus: 'pending',
-    timestamp: new Date().toISOString()
-  };
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('markers', 'readwrite');
-    const store = tx.objectStore('markers');
-    store.put(marker);
-    tx.oncomplete = () => {
-      syncPendingMarkers(); // Försök synka i bakgrunden
-      resolve(marker);
-    };
-    tx.onerror = (e) => reject(e);
-  });
-}
-
-// Hämta alla markörer
-export async function getAllMarkers() {
-  return new Promise((resolve) => {
-    const tx = db.transaction('markers', 'readonly');
-    const store = tx.objectStore('markers');
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-  });
-}
-
-// Ta bort en markör lokalt
-export async function deleteMarker(id) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('markers', 'readwrite');
-    const store = tx.objectStore('markers');
-    const request = store.delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = (e) => reject(e);
-  });
-}
-
-// Synkroniseringskö mot Google Apps Script
-export async function syncPendingMarkers() {
-  if (!navigator.onLine || !db) return;
-
-  const tx = db.transaction('markers', 'readonly');
-  const store = tx.objectStore('markers');
-  const index = store.getIndex('syncStatus');
-  const request = index.getAll('pending');
-
-  request.onsuccess = async () => {
-    const pending = request.result;
-    for (const marker of pending) {
-      try {
-        const response = await fetch(SCRIPT_URL, {
-          method: 'POST',
-          body: JSON.stringify({
-            title: marker.title,            // Ex: "Gula kantareller"
-            category: marker.categoryGroup, // Ex: "Svamp"
-            latitude: marker.lat,
-            longitude: marker.lng,
-            description: marker.description,
-            timestamp: marker.timestamp,
-            id: marker.id
-          })
-        });
-
-        if (response.ok) {
-          // Markera som synkad
-          const writeTx = db.transaction('markers', 'readwrite');
-          const writeStore = writeTx.objectStore('markers');
-          marker.syncStatus = 'synced';
-          writeStore.put(marker);
-        }
-      } catch (err) {
-        console.warn('Synk misslyckades för markör:', marker.id, err);
+    request.onupgradeneeded = (e) => {
+      const dbInstance = e.target.result;
+      if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
+        dbInstance.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
-    }
-  };
+    };
+  });
 }
 
-// Lyssna på när enheten får tillbaka nätverkstäckning
-window.addEventListener('online', syncPendingMarkers);
+export async function saveMarker(place) {
+  const dbInstance = await initDB();
+  
+  return new Promise((resolve, reject) => {
+    const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    
+    place.syncStatus = place.syncStatus || 'pending';
+    const request = store.put(place);
+
+    request.onsuccess = () => {
+      if (navigator.onLine && place.syncStatus === 'pending') {
+        syncSingleMarker(place);
+      }
+      resolve(place);
+    };
+
+    request.onerror = (e) => {
+      reject(e.target.error);
+    };
+  });
+}
+
+export async function getAllMarkers() {
+  const dbInstance = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = dbInstance.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+export async function deleteMarker(id) {
+  const dbInstance = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.delete(id);
+
+    request.onsuccess = () => resolve(true);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function syncSingleMarker(place) {
+  try {
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'save', ...place })
+    });
+    
+    place.syncStatus = 'synced';
+    const dbInstance = await initDB();
+    const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(place);
+  } catch (err) {
+    console.warn("Bakgrundssynk misslyckades, sparad lokalt:", err);
+  }
+}
+
+export async function syncPendingMarkers() {
+  if (!navigator.onLine) return;
+  const places = await getAllMarkers();
+  const pending = places.filter(p => p.syncStatus === 'pending');
+  for (const place of pending) {
+    await syncSingleMarker(place);
+  }
+}
