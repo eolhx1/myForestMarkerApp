@@ -108,13 +108,25 @@ document.head.appendChild(styleSheet);
 // 3. Tillstånd, Kategorier & Bildkomprimering
 // -----------------------------------------------------------------
 const categories = [
-  { id: 'gula-kantareller', name: 'Gula kantareller', icon: '🍄' },
+  { 
+    id: 'gula-kantareller', 
+    name: 'Gula kantareller', 
+    iconSvg: `<svg viewBox="0 0 36 36" class="w-7 h-7"><path fill="#FFAC22" d="M18 3c-7 0-12 5-12 9 0 3.5 4 5.5 6 6.5V31c0 1.5 2 2 6 2s6-.5 6-2V18.5c2-1 6-3 6-6.5 0-4-5-9-12-9z"/><path fill="#FFCC4D" d="M6 12c0 3 5 4.5 12 4.5s12-1.5 12-4.5c0-3.5-5-7-12-7S6 8.5 6 12z"/></svg>`
+  },
+  { 
+    id: 'hjortron', 
+    name: 'Hjortron', 
+    iconSvg: `<svg viewBox="0 0 36 36" class="w-7 h-7"><circle cx="18" cy="14" r="5" fill="#FF8C00"/><circle cx="13" cy="18" r="5" fill="#FFA500"/><circle cx="23" cy="18" r="5" fill="#FFA500"/><circle cx="18" cy="22" r="5" fill="#FF7F00"/><path fill="#228B22" d="M18 4c-2 3-5 4-8 4 3 2 5 5 5 8h6c0-3 2-6 5-8-3 0-6-1-8-4z"/></svg>`
+  },
+  { 
+    id: 'lingon', 
+    name: 'Lingon', 
+    iconSvg: `<svg viewBox="0 0 36 36" class="w-7 h-7"><circle cx="14" cy="20" r="6" fill="#DC2626"/><circle cx="23" cy="21" r="5.5" fill="#B91C1C"/><path fill="#166534" d="M18 7c-4 1-7 5-7 9h4c4 0 7-4 7-9zm1 0c4 1 7 5 7 9h-4c-4 0-7-4-7-9z"/></svg>`
+  },
   { id: 'trattkantareller', name: 'Trattkantareller', icon: '🍂' },
   { id: 'karljohan', name: 'Karljohan / Svamp', icon: '🍄' },
   { id: 'matsvamp', name: 'Annan matsvamp', icon: '🪵' },
   { id: 'blabar', name: 'Blåbär', icon: '🫐' },
-  { id: 'lingon', name: 'Lingon', icon: '🍒' },
-  { id: 'hjortron', name: 'Hjortron', icon: '👑' },
   { id: 'hallon', name: 'Smultron / Hallon', icon: '🍓' },
   { id: 'fiske', name: 'Fiskeplats', icon: '🎣' },
   { id: 'talt', name: 'Tält- & Lägerplats', icon: '⛺' },
@@ -123,6 +135,7 @@ const categories = [
   { id: 'tjarn', name: 'Skogstjärn / Bad', icon: '🏊' },
   { id: 'annat', name: 'Annat naturfynd', icon: '📍' }
 ];
+
 
 let selectedCategory = categories[0];
 let selectedAmount = 'Rikligt med fynd';
@@ -185,9 +198,17 @@ function renderCategoryGrid() {
   if (!grid) return;
   grid.innerHTML = categories.map(cat => {
     const isSelected = cat.id === selectedCategory.id;
+    
+    // Använd SVG om det finns, annars vanlig emoji
+    const iconHtml = cat.iconSvg 
+      ? cat.iconSvg 
+      : `<span class="text-xl">${cat.icon}</span>`;
+
     return `
       <button data-id="${cat.id}" class="category-btn p-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition ${isSelected ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}">
-        <span class="text-xl">${cat.icon}</span>
+        <div class="flex items-center justify-center h-7 w-7">
+          ${iconHtml}
+        </div>
         <span class="text-[10px] leading-tight text-center">${cat.name}</span>
       </button>
     `;
@@ -202,6 +223,7 @@ function renderCategoryGrid() {
     });
   });
 }
+
 
 document.querySelectorAll('.amount-btn').forEach(btn => {
   btn.addEventListener('click', (e) => {
