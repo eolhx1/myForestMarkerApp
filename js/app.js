@@ -28,10 +28,43 @@ L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // Initiera och ladda sparade markörer vid start
 initDB().then(async () => {
+  // 1. Ladda först det som finns sparat lokalt i IndexedDB
   const stored = await getAllMarkers();
   stored.forEach(place => addPlaceToMap(place));
+
+  // 2. Hämta befintliga poster från Google Sheets online
+  if (navigator.onLine) {
+    try {
+      const res = await fetch(SCRIPT_URL);
+      const remoteData = await res.json();
+      
+      if (Array.isArray(remoteData)) {
+        for (const item of remoteData) {
+          const formatted = {
+            id: String(item.Id || item.id || 'marker_' + Date.now()),
+            lat: Number(item.Latitude || item.lat),
+            lng: Number(item.Longitude || item.lng),
+            title: item.Title || item.title || 'Skogsfynd',
+            categoryGroup: item.Category || item.category || 'Övrigt',
+            category: item.Category || item.category || 'Övrigt',
+            description: item.Description || item.description || '',
+            photo: item.Photo || item.photo || null,
+            timestamp: item.Timestamp || item.timestamp || '',
+            syncStatus: 'synced'
+          };
+          
+          await saveMarker(formatted);
+          addPlaceToMap(formatted);
+        }
+      }
+    } catch (err) {
+      console.warn("Kunde inte hämta markörer från Google Sheets:", err);
+    }
+  }
+
   await syncPendingMarkers();
 }).catch(err => console.error(err));
+
 
 
 // -----------------------------------------------------------------
