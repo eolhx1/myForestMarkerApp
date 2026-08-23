@@ -363,14 +363,33 @@ window.removeCurrentMarker = async function(placeId) {
 };
 
 async function initAppStorage() {
+  // 1. Ladda och visa lokala platser direkt för snabb uppstart
   const localPlaces = await getLocalPlaces();
   localPlaces.forEach(place => addPlaceToMap(place));
 
+  // 2. Om online, gör en full synk mot Google Sheets
   if (navigator.onLine) {
     try {
       const response = await fetch(SCRIPT_URL);
       const remotePlaces = await response.json();
       
+      const remoteIds = new Set(remotePlaces.map(p => String(p.id)));
+
+      // A. Ta bort lokala platser som har raderats i Sheets från annan enhet (om de var synkade)
+      for (const localPlace of localPlaces) {
+        if (localPlace.synced && !remoteIds.has(String(localPlace.id))) {
+          // Ta bort från kartan
+          const marker = markerMap.get(localPlace.id);
+          if (marker) map.removeLayer(marker);
+          markerMap.delete(localPlace.id);
+          
+          // Ta bort från IndexedDB och lokal array
+          await deletePlaceLocally(localPlace.id);
+          savedPlaces = savedPlaces.filter(p => String(p.id) !== String(localPlace.id));
+        }
+      }
+
+      // B. Lägg till nya platser från Sheets som saknas lokalt
       for (const rPlace of remotePlaces) {
         if (!savedPlaces.some(p => String(p.id) === String(rPlace.id))) {
           rPlace.synced = true;
@@ -378,11 +397,16 @@ async function initAppStorage() {
           addPlaceToMap(rPlace);
         }
       }
+
+      updateMarkerCount();
+      renderListView();
+
     } catch (err) {
-      console.log("Körs i offline-läge.");
+      console.log("Körs i offline-läge eller kunde inte hämta från Sheets.");
     }
   }
 }
+
 
 window.addEventListener('online', async () => {
   const places = await getLocalPlaces();
