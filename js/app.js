@@ -26,30 +26,33 @@ setTimeout(() => {
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Initiera och ladda sparade markörer vid start
-initDB().then(async () => {
-  // 1. Ladda först det som finns sparat lokalt i IndexedDB
-  const stored = await getAllMarkers();
-  stored.forEach(place => addPlaceToMap(place));
+// Initiera och ladda sparade markörer när sidan har laddats
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await initDB();
 
-  // 2. Hämta befintliga poster från Google Sheets online
-  if (navigator.onLine) {
-    try {
+    // 1. Ladda först det som finns sparat lokalt i IndexedDB
+    const stored = await getAllMarkers();
+    stored.forEach(place => addPlaceToMap(place));
+
+    // 2. Hämta befintliga poster från Google Sheets (Kod.gs)
+    if (navigator.onLine) {
       const res = await fetch(SCRIPT_URL);
       const remoteData = await res.json();
       
       if (Array.isArray(remoteData)) {
         for (const item of remoteData) {
+          if (!item.id || !item.lat || !item.lng) continue;
+
           const formatted = {
-            id: String(item.Id || item.id || 'marker_' + Date.now()),
-            lat: Number(item.Latitude || item.lat),
-            lng: Number(item.Longitude || item.lng),
-            title: item.Title || item.title || 'Skogsfynd',
-            categoryGroup: item.Category || item.category || 'Övrigt',
-            category: item.Category || item.category || 'Övrigt',
-            description: item.Description || item.description || '',
-            photo: item.Photo || item.photo || null,
-            timestamp: item.Timestamp || item.timestamp || '',
+            id: String(item.id),
+            lat: Number(item.lat),
+            lng: Number(item.lng),
+            title: item.title || 'Skogsfynd',
+            categoryGroup: item.category || 'Övrigt',
+            category: item.category || 'Övrigt',
+            description: item.description || '',
+            timestamp: item.timestamp || '',
             syncStatus: 'synced'
           };
           
@@ -57,13 +60,13 @@ initDB().then(async () => {
           addPlaceToMap(formatted);
         }
       }
-    } catch (err) {
-      console.warn("Kunde inte hämta markörer från Google Sheets:", err);
     }
-  }
 
-  await syncPendingMarkers();
-}).catch(err => console.error(err));
+    await syncPendingMarkers();
+  } catch (err) {
+    console.error("Fel vid laddning av markörer:", err);
+  }
+});
 
 
 
