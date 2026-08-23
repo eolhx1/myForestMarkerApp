@@ -132,6 +132,9 @@ if (toggleBtn && menu) {
 // -----------------------------------------------------------------
 // 2. Ikoner & Stilmallar
 // -----------------------------------------------------------------
+
+
+
 const mushroomIcon = L.divIcon({
   className: 'custom-marker',
   html: `
@@ -145,17 +148,27 @@ const mushroomIcon = L.divIcon({
   popupAnchor: [0, -36]
 });
 
+// Navigeringsvariabler
+let activeNavMarkerId = null;
+let navLine = null;
+let currentHeading = 0;
+
+// Ny GPS-ikon med kompasspil
 const myLocationIcon = L.divIcon({
   className: 'my-location-marker',
   html: `
-    <div style="position: relative; width: 22px; height: 22px;">
-      <div style="position: absolute; width: 22px; height: 22px; background: rgba(59, 130, 246, 0.4); border-radius: 50%; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-      <div style="position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: #2563eb; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
+    <div style="position: relative; width: 32px; height: 32px;">
+      <div id="user-heading-arrow" style="position: absolute; top: 0; left: 0; width: 32px; height: 32px; transition: transform 0.2s ease-out; transform-origin: center center;">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
+          <path d="M12 2L19 21L12 17L5 21L12 2Z" fill="#2563eb" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+      </div>
     </div>
   `,
-  iconSize: [22, 22],
-  iconAnchor: [11, 11]
+  iconSize: [32, 32],
+  iconAnchor: [16, 16]
 });
+
 
 const styleSheet = document.createElement("style");
 styleSheet.innerText = `
@@ -390,9 +403,13 @@ function createPopupContent(place, placeId) {
         <div>🕐 <strong>Tid:</strong> ${place.timestamp ? place.timestamp.slice(0, 10) : ''}</div>
       </div>
       <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex gap-2">
-        <a href="${googleEarthUrl}" target="_blank" class="flex-1 text-center bg-blue-50 text-blue-700 border border-blue-200 py-1.5 rounded-xl text-xs font-semibold">🌐 Earth 3D</a>
-        <a href="${googleMapsUrl}" target="_blank" class="flex-1 text-center bg-emerald-50 text-emerald-700 border border-emerald-200 py-1.5 rounded-xl text-xs font-semibold">🗺️ Maps</a>
+        <button onclick="window.toggleNavigation('${placeId}')" class="flex-1 text-center bg-blue-600 text-white py-1.5 rounded-xl text-xs font-semibold hover:bg-blue-700 transition">
+          🧭 Gå hit
+        </button>
+        <a href="${googleEarthUrl}" target="_blank" class="py-1.5 px-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold">🌐 Earth</a>
+        <a href="${googleMapsUrl}" target="_blank" class="py-1.5 px-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold">🗺️ Maps</a>
       </div>
+
     </div>
   `;
 }
@@ -456,6 +473,23 @@ function updatePosition(position, autoCenter = false) {
     }).addTo(map);
   }
 
+  // Om aktiv navigering pågår, uppdatera linjen på kartan
+  if (activeNavMarkerId && savedPlaces.length > 0) {
+    const target = savedPlaces.find(p => String(p.id) === String(activeNavMarkerId));
+    if (target) {
+      const targetCoords = [Number(target.lat), Number(target.lng)];
+      if (navLine) {
+        navLine.setLatLngs([[latitude, longitude], targetCoords]);
+      } else {
+        navLine = L.polyline([[latitude, longitude], targetCoords], {
+          color: '#2563eb',
+          weight: 4,
+          dashArray: '8, 8'
+        }).addTo(map);
+      }
+    }
+  }
+
   if (autoCenter) {
     map.flyTo([latitude, longitude], 16, { 
       duration: 1.5,
@@ -463,6 +497,40 @@ function updatePosition(position, autoCenter = false) {
     });
   }
 }
+
+// Global funktion för att starta/stoppa navigering
+window.toggleNavigation = function(id) {
+  if (activeNavMarkerId === id) {
+    // Stäng av navigering
+    activeNavMarkerId = null;
+    if (navLine) {
+      map.removeLayer(navLine);
+      navLine = null;
+    }
+    alert("Navigering avslutad.");
+  } else {
+    // Starta navigering
+    activeNavMarkerId = id;
+    const target = savedPlaces.find(p => String(p.id) === String(id));
+    if (target && currentCoords) {
+      const targetCoords = [Number(target.lat), Number(target.lng)];
+      if (navLine) map.removeLayer(navLine);
+      
+      navLine = L.polyline([currentCoords, targetCoords], {
+        color: '#2563eb',
+        weight: 4,
+        dashArray: '8, 8'
+      }).addTo(map);
+
+      const dist = calculateDistance(currentCoords[0], currentCoords[1], targetCoords[0], targetCoords[1]);
+      alert(`Navigerar till ${target.title} (${dist} bort)`);
+      map.fitBounds(L.latLngBounds([currentCoords, targetCoords]), { padding: [50, 50] });
+    } else {
+      alert("Kan inte navigera utan GPS-signal.");
+    }
+  }
+};
+
 
 if ('geolocation' in navigator) {
   let initialCenter = false;
@@ -480,6 +548,44 @@ document.getElementById('btn-recenter')?.addEventListener('click', () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }
+
+// Orientera till 
+function handleOrientation(event) {
+  let heading = null;
+  
+  if (event.webkitCompassHeading) {
+    // iOS
+    heading = event.webkitCompassHeading;
+  } else if (event.alpha !== null) {
+    // Android (beräknas utifrån alpha)
+    heading = 360 - event.alpha;
+  }
+
+  if (heading !== null) {
+    currentHeading = heading;
+    const arrowEl = document.getElementById('user-heading-arrow');
+    if (arrowEl) {
+      arrowEl.style.transform = `rotate(${heading}deg)`;
+    }
+  }
+}
+
+// Aktivera kompasslyssnare
+if (window.DeviceOrientationEvent) {
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // För iOS krävs explicit tillåtelse
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') {
+        window.addEventListener('deviceorientation', handleOrientation, true);
+      }
+    }).catch(console.error);
+  } else {
+    // Android & standard webbläsare
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true) ||
+    window.addEventListener('deviceorientation', handleOrientation, true);
+  }
+}
+
 
 // -----------------------------------------------------------------
 // 7. Listvy & Flikväxling
