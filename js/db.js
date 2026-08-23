@@ -87,13 +87,26 @@ export async function deleteMarker(id) {
 
 async function syncSingleMarker(place) {
   try {
-    const response = await fetch(SCRIPT_URL, {
+    // Förbered nytt payload-objekt som matchar vad Kod.gs förväntar sig
+    const payload = {
+      title: place.title || '',
+      categoryGroup: place.categoryGroup || place.category || '',
+      lat: place.lat !== undefined ? place.lat : place.latitude,
+      lng: place.lng !== undefined ? place.lng : place.longitude,
+      description: place.description || '',
+      timestamp: place.timestamp || new Date().toISOString(),
+      id: String(place.id),
+      photo: place.photo || null
+    };
+
+    await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'save', ...place })
+      body: JSON.stringify(payload)
     });
     
+    // Uppdatera status lokalt efter sändning
     place.syncStatus = 'synced';
     const dbInstance = await initDB();
     const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
