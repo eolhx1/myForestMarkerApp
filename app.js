@@ -483,15 +483,24 @@ function addPlaceToMap(place) {
   const placeId = String(place.id || ('marker_' + Date.now()));
   place.id = placeId;
 
-  const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
-  markerMap.set(placeId, marker);
-  marker.bindPopup(createPopupContent(place, placeId));
-  
-  savedPlaces.push(place);
+  // Skapa och lägg till Leaflet-markör om den inte redan finns
+  if (!markerMap.has(placeId)) {
+    const marker = L.marker([place.lat, place.lng], { icon: mushroomIcon }).addTo(map);
+    markerMap.set(placeId, marker);
+    marker.bindPopup(createPopupContent(place, placeId));
+  }
+
+  // Lägg bara till i savedPlaces om id:t inte redan finns i arrayen
+  if (!savedPlaces.some(p => String(p.id) === placeId)) {
+    savedPlaces.push(place);
+  }
+
   updateMarkerCount();
   renderListView();
-  return marker;
+  
+  return markerMap.get(placeId);
 }
+
 
 // -----------------------------------------------------------------
 // 6. GPS-spårning
@@ -507,20 +516,38 @@ function updatePosition(position, autoCenter = false) {
   if (badge) badge.innerText = accText;
   if (footer) footer.innerText = `GPS: ${accText}`;
 
-  if (userPositionMarker && userAccuracyCircle) {
-    userPositionMarker.setLatLng([latitude, longitude]);
-    userAccuracyCircle.setLatLng([latitude, longitude]);
-    userAccuracyCircle.setRadius(accuracy);
-  } else {
-    userAccuracyCircle = L.circle([latitude, longitude], { radius: accuracy, color: '#3b82f6', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.15 }).addTo(map);
-    userPositionMarker = L.marker([latitude, longitude], { icon: myLocationIcon, zIndexOffset: 1000 }).addTo(map);
+  // Ta bort den gamla osäkerhetscirkeln om den finns
+  if (userAccuracyCircle) {
+    map.removeLayer(userAccuracyCircle);
   }
 
-  if (autoCenter) map.flyTo([latitude, longitude], 16, { 
+  // Rita ut den nya cirkeln för osäkerhetsradie
+  userAccuracyCircle = L.circle([latitude, longitude], { 
+    radius: accuracy, 
+    color: '#3b82f6', 
+    weight: 1, 
+    fillColor: '#3b82f6', 
+    fillOpacity: 0.15 
+  }).addTo(map);
+
+  // Uppdatera eller skapa blå punkt-markören för användaren
+  if (userPositionMarker) {
+    userPositionMarker.setLatLng([latitude, longitude]);
+  } else {
+    userPositionMarker = L.marker([latitude, longitude], { 
+      icon: myLocationIcon, 
+      zIndexOffset: 1000 
+    }).addTo(map);
+  }
+
+  if (autoCenter) {
+    map.flyTo([latitude, longitude], 16, { 
       duration: 1.5,
       easeLinearity: 0.25 
-  });
+    });
+  }
 }
+
 
 if ('geolocation' in navigator) {
   let initialCenter = false;
