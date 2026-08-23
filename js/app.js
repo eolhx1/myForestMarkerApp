@@ -10,7 +10,7 @@ import { exportToGPX } from './exporter.js';
 let selectedCategory = CATEGORIES[0];
 let selectedAmount = 'Rikligt med fynd';
 let savedPlaces = [];
-let markerMap = new Map();
+let markersMap = {};
 let userPositionMarker = null;
 let userAccuracyCircle = null;
 let currentCoords = null;
@@ -426,7 +426,6 @@ function addPlaceToMap(place) {
 
   const iconEmoji = getCategoryIcon(place);
 
-  // Skapa dynamisk ikon baserat på kategorin
   const customIcon = L.divIcon({
     className: 'custom-map-pin',
     html: `
@@ -452,11 +451,12 @@ function addPlaceToMap(place) {
 
   const marker = L.marker([Number(place.lat), Number(place.lng)], { icon: customIcon });
   
-  marker.bindPopup(createPopupContent(place));
+  marker.bindPopup(createPopupContent(place, place.id));
   marker.addTo(map);
 
   markersMap[place.id] = marker;
 }
+
 
 
 // Hjälpfunktion för att välja ikon utifrån kategori/titel
