@@ -363,49 +363,67 @@ window.removeCurrentMarker = async function(placeId) {
 };
 
 async function initAppStorage() {
-  // 1. Ladda och visa lokala platser direkt för snabb uppstart
+  // 1. Ladda och visa lokala platser direkt för snabb start
   const localPlaces = await getLocalPlaces();
   localPlaces.forEach(place => addPlaceToMap(place));
 
-  // 2. Om online, gör en full synk mot Google Sheets
+  // 2. Om online, hämta färsk data från Google Sheets
   if (navigator.onLine) {
     try {
       const response = await fetch(SCRIPT_URL);
-      const remotePlaces = await response.json();
+      const data = await response.json();
       
+      // Säkerställ att vi fick en array tillbaka
+      const remotePlaces = Array.isArray(data) ? data : [];
       const remoteIds = new Set(remotePlaces.map(p => String(p.id)));
 
-      // A. Ta bort lokala platser som har raderats i Sheets från annan enhet (om de var synkade)
+      // A. Rensa lokala platser som inte längre finns i Sheets
       for (const localPlace of localPlaces) {
         if (localPlace.synced && !remoteIds.has(String(localPlace.id))) {
-          // Ta bort från kartan
-          const marker = markerMap.get(localPlace.id);
-          if (marker) map.removeLayer(marker);
-          markerMap.delete(localPlace.id);
+          // Ta bort Leaflet-markören från kartan
+          const marker = markerMap.get(String(localPlace.id));
+          if (marker) {
+            map.removeLayer(marker);
+            markerMap.delete(String(localPlace.id));
+          }
           
-          // Ta bort från IndexedDB och lokal array
+          // Ta bort från IndexedDB
           await deletePlaceLocally(localPlace.id);
-          savedPlaces = savedPlaces.filter(p => String(p.id) !== String(localPlace.id));
         }
       }
 
-      // B. Lägg till nya platser från Sheets som saknas lokalt
+      // B. Töm den lokala minnesarrayen och lägg till det som faktiskt finns kvar
+      savedPlaces = [];
+      
+      // Om det finns poster i Sheets, spara och rita ut dem
       for (const rPlace of remotePlaces) {
-        if (!savedPlaces.some(p => String(p.id) === String(rPlace.id))) {
-          rPlace.synced = true;
-          await savePlaceLocally(rPlace);
-          addPlaceToMap(rPlace);
+        rPlace.synced = true;
+        await savePlaceLocally(rPlace);
+        
+        // Rita bara ut på kartan om den inte redan finns där
+        if (!markerMap.has(String(rPlace.id))) {
+          const marker = L.marker([rPlace.lat, rPlace.lng], { icon: mushroomIcon }).addTo(map);
+          markerMap.set(String(rPlace.id), marker);
+          marker.bindPopup(createPopupContent(rPlace, String(rPlace.id)));
         }
+        savedPlaces.push(rPlace);
+      }
+
+      // Om Sheets var helt tomt, rensa alla kvarvarande markörer från kartan
+      if (remotePlaces.length === 0) {
+        markerMap.forEach(marker => map.removeLayer(marker));
+        markerMap.clear();
       }
 
       updateMarkerCount();
       renderListView();
 
     } catch (err) {
-      console.log("Körs i offline-läge eller kunde inte hämta från Sheets.");
+      console.warn("Kunde inte synka med Sheets:", err);
     }
   }
 }
+
 
 
 window.addEventListener('online', async () => {
