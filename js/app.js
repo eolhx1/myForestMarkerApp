@@ -26,6 +26,14 @@ setTimeout(() => {
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+// Initiera och ladda sparade markörer vid start
+initDB().then(async () => {
+  const stored = await getAllMarkers();
+  stored.forEach(place => addPlaceToMap(place));
+  await syncPendingMarkers();
+}).catch(err => console.error(err));
+
+
 // -----------------------------------------------------------------
 // 1. Kartlager & Kartväljare
 // -----------------------------------------------------------------
@@ -281,6 +289,42 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
 // -----------------------------------------------------------------
 // 5. Markör & Kartvisning
 // -----------------------------------------------------------------
+
+window.removeCurrentMarker = async function(id) {
+  if (!confirm("Vill du ta bort denna markör?")) return;
+
+  try {
+    // 1. Ta bort från IndexedDB
+    await deleteMarker(id);
+
+    // 2. Skicka radera-anrop till Google Sheets i bakgrunden
+    if (navigator.onLine) {
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'delete', id: id })
+      }).catch(err => console.warn("Kunde inte radera från Sheets:", err));
+    }
+
+    // 3. Ta bort från kartan om den finns där
+    if (markerMap.has(id)) {
+      map.removeLayer(markerMap.get(id));
+      markerMap.delete(id);
+    }
+
+    // 4. Ta bort från den lokala listan och uppdatera vyer
+    savedPlaces = savedPlaces.filter(p => String(p.id) !== String(id));
+    updateMarkerCount();
+    renderListView();
+    map.closePopup();
+
+  } catch (err) {
+    alert("Kunde inte radera markören: " + err.message);
+  }
+};
+
+
 function createPopupContent(place, placeId) {
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
   const googleEarthUrl = `https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r`;
