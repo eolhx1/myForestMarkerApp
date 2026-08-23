@@ -670,3 +670,20 @@ if (btnMap) {
     setTimeout(() => map.invalidateSize(), 100);
   });
 }
+
+// -----------------------------------------------------------------
+// Hamburgermeny Logik
+// -----------------------------------------------------------------
+const btnHamburger = document.getElementById('btn-hamburger');
+const hamburgerMenu = document.getElementById('hamburger-menu');
+
+if (btnHamburger && hamburgerMenu) {
+  btnHamburger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hamburgerMenu.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', () => {
+    hamburgerMenu.classList.add('hidden');
+  });
+}

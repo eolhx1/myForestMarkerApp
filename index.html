@@ -27,44 +27,70 @@
 <body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
 
 <!-- Header -->
-<header class="grid grid-cols-3 items-center px-4 py-2 bg-white border-b border-slate-200">
-  <!-- Vänster: GPS-badge -->
+<!-- Top Header med CSS Grid och Hamburgermeny -->
+<header class="grid grid-cols-3 items-center px-4 py-2.5 bg-white border-b border-slate-200 sticky top-0 z-[2000]">
+  
+  <!-- Vänster: GPS Badge (Ligger bergfast till vänster) -->
   <div class="justify-self-start">
-    <span id="gps-accuracy-badge" class="min-w-[4rem] inline-block text-center text-xs bg-slate-100 px-2.5 py-1 rounded-full text-slate-600 font-semibold border border-slate-200">
-      ±5m
+    <span class="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-semibold border border-slate-200/80 shadow-sm">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span id="gps-accuracy-badge">±--m</span>
     </span>
   </div>
 
-  <!-- Mitten: Logga & Rubrik -->
+  <!-- Mitten: Logotyp (Ligger garanterat exakt i mitten) -->
   <div class="justify-self-center flex items-center gap-2">
-    <span class="text-2xl">🍄</span>
-    <div>
-      <h1 class="font-bold text-slate-900 leading-none">Skogsmarkören</h1>
-      <p class="text-[10px] text-slate-500 font-medium">GPS • Google Sheets & Earth</p>
+    <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-lg shadow-inner">
+      🍄
+    </div>
+    <div class="text-left">
+      <h1 class="font-bold text-slate-900 text-sm leading-none">Skogsmarkören</h1>
+      <p class="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">GPS & Kartbok</p>
     </div>
   </div>
 
-  <!-- Höger: Earth/Knapp -->
-  <div class="justify-self-end">
-    <!-- Din högra knapp eller tom div -->
+  <!-- Höger: Hamburgermeny (Subtil och framtidssäker) -->
+  <div class="justify-self-end relative">
+    <button id="btn-hamburger" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 active:scale-95 transition">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+      </svg>
+    </button>
+
+    <!-- Dropdown-meny -->
+    <div id="hamburger-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-[3000]">
+      <a href="https://earth.google.com/web/" target="_blank" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+        <span>🌐</span> Google Earth 3D
+      </a>
+      <hr class="my-1 border-slate-100">
+      <div class="px-4 py-1.5 text-[10px] text-slate-400 font-medium">
+        Skogsmarkören v1.0
+      </div>
+    </div>
   </div>
+
 </header>
 
 
+
 <!-- Controls -->
-<div class="p-2 bg-slate-100 flex items-center gap-2">
-    <div class="flex bg-slate-200/80 p-1 rounded-2xl flex-1 text-xs font-semibold">
-        <button id="btn-show-map" class="flex-1 py-2 px-3 bg-white rounded-xl shadow-sm text-emerald-800 flex items-center justify-center gap-1 transition-all">
-            🗺️ Karta & Topo
-        </button>
-        <button id="btn-show-list" class="flex-1 py-2 px-3 rounded-xl text-slate-600 flex items-center justify-center gap-1 transition-all">
-            📋 Lista (<span class="marker-count-val">0</span>)
-        </button>
-    </div>
-    <button id="btn-mark" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2.5 px-4 rounded-2xl shadow flex items-center gap-1.5">
-        📍 Markera min position
+<!-- Flikväljare & Åtgärder -->
+<div class="px-4 py-2 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between gap-2">
+  <div class="flex bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-medium border border-slate-300/40">
+    <button id="btn-show-map" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 bg-white text-emerald-900 font-semibold shadow-sm transition">
+      🗺️ <span>Karta</span>
     </button>
+    <button id="btn-show-list" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-600 hover:text-slate-900 transition">
+      📋 <span>Lista</span>
+      <span class="marker-count-val ml-0.5 bg-emerald-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">0</span>
+    </button>
+  </div>
+
+  <button id="btn-mark" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition">
+    <span>📍</span> Markera position
+  </button>
 </div>
+
 
 <!-- Main View Area -->
 <div class="relative flex-1 overflow-hidden">
