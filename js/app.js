@@ -31,45 +31,61 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await initDB();
 
-    // 1. Ladda först det som finns sparat lokalt i IndexedDB
-    const stored = await getAllMarkers();
-    if (stored && stored.length > 0) {
-      savedPlaces = stored;
-      savedPlaces.forEach(place => addPlaceToMap(place));
-    }
+    // Töm listan helt vid start
+    savedPlaces = [];
 
-    // 2. Hämta befintliga poster från Google Sheets (Kod.gs)
+    // 1. Hämta först från Google Sheets (vår "sanna" källa)
     if (navigator.onLine) {
-      const res = await fetch(SCRIPT_URL);
-      const remoteData = await res.json();
-      
-      if (Array.isArray(remoteData) && remoteData.length > 0) {
-        // Töm lokala listan och fyll med färsk data från kalkylarket
-        savedPlaces = [];
+      try {
+        const res = await fetch(SCRIPT_URL);
+        const remoteData = await res.json();
         
-        for (const item of remoteData) {
-          if (!item.id || item.lat === undefined || item.lng === undefined) continue;
+        if (Array.isArray(remoteData) && remoteData.length > 0) {
+          remoteData.forEach(item => {
+            if (!item.id || item.lat === undefined || item.lng === undefined) return;
 
-          const formatted = {
-            id: String(item.id),
-            lat: Number(item.lat),
-            lng: Number(item.lng),
-            title: item.title || 'Skogsfynd',
-            categoryGroup: item.category || 'Övrigt',
-            category: item.category || 'Övrigt',
-            description: item.description || '',
-            timestamp: item.timestamp || '',
-            syncStatus: 'synced'
-          };
-          
-          await saveMarker(formatted);
-          savedPlaces.push(formatted);
-          addPlaceToMap(formatted);
+            const formatted = {
+              id: String(item.id),
+              lat: Number(item.lat),
+              lng: Number(item.lng),
+              title: item.title || 'Skogsfynd',
+              categoryGroup: item.category || 'Övrigt',
+              category: item.category || 'Övrigt',
+              description: item.description || '',
+              timestamp: item.timestamp || '',
+              syncStatus: 'synced'
+            };
+            
+            // Spara ner i lokal DB och lägg till om den inte redan finns
+            saveMarker(formatted);
+            
+            if (!savedPlaces.some(p => p.id === formatted.id)) {
+              savedPlaces.push(formatted);
+              addPlaceToMap(formatted);
+            }
+          });
         }
+      } catch (sheetErr) {
+        console.warn("Kunde inte hämta från Google Sheets:", sheetErr);
       }
     }
 
-    // Uppdatera räknaren och rita ut listvyn med den inlästa datan
+    // 2. Om vi är offline eller om Sheets misslyckades, hämta från lokal DB
+    if (savedPlaces.length === 0) {
+      const stored = await getAllMarkers();
+      if (stored && stored.length > 0) {
+        stored.forEach(place => {
+          const placeId = String(place.id);
+          if (!savedPlaces.some(p => p.id === placeId)) {
+            const formatted = { ...place, id: placeId };
+            savedPlaces.push(formatted);
+            addPlaceToMap(formatted);
+          }
+        });
+      }
+    }
+
+    // Uppdatera räknare och listvy
     updateMarkerCount();
     renderListView();
 
@@ -78,6 +94,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error("Fel vid laddning av markörer:", err);
   }
 });
+
 
 
 
