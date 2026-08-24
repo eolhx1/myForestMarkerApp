@@ -482,14 +482,27 @@ function addPlaceToMap(place) {
         popupAnchor: [0, -18]
     });
 
+
+
+
+
+
     const marker = L.marker([Number(place.lat), Number(place.lng)], {
         icon: customIcon
     });
     marker.bindPopup(createPopupContent(place, place.id));
-    marker.addTo(map);
+    
+    
+    const itemCategory = place.category || place.categoryGroup || 'Övrigt';
+    const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+
+    if (isVisible) {
+        marker.addTo(map);
+    }
 
     markersMap[place.id] = marker;
 }
+
 
 function getCategoryIcon(place) {
     const cat = (place.category || place.categoryGroup || place.title || '').toLowerCase();
@@ -697,6 +710,51 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return d < 1 ? `${Math.round(d * 1000)} m`: `${d.toFixed(1)} km`;
 }
 
+// Central funktion som filtrerar BÅDE kartan och listan
+function applyCategoryFilter(category) {
+    activeCategoryFilter = category;
+
+    // 1. Dölj/Visa markörer på kartan
+    Object.keys(markersMap).forEach(id => {
+        const marker = markersMap[id];
+        const place = savedPlaces.find(p => String(p.id) === String(id));
+        
+        if (!place) return;
+
+        const itemCategory = place.category || place.categoryGroup || 'Övrigt';
+        const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+
+        if (isVisible) {
+            if (!map.hasLayer(marker)) marker.addTo(map);
+        } else {
+            if (map.hasLayer(marker)) map.removeLayer(marker);
+        }
+    });
+
+    // 2. Uppdatera listan, filterknapparna och indikatorn på kartan
+    renderFilterChips();
+    renderListView();
+    updateMapFilterBadge();
+}
+
+// Visar/döljer en filter-indikator på kartan om du har knappen i HTML
+function updateMapFilterBadge() {
+    const badge = document.getElementById('active-filter-badge');
+    const badgeText = document.getElementById('active-filter-text');
+    if (!badge || !badgeText) return;
+
+    if (activeCategoryFilter !== 'all') {
+        badgeText.innerText = `Visar: ${activeCategoryFilter}`;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// Gör så att klick på kartans filter-badge återställer till alla markörer
+document.getElementById('active-filter-badge')?.addEventListener('click', () => {
+    applyCategoryFilter('all');
+});
 
 
 // Lyssnare för sökfält och filterknappar
@@ -704,25 +762,6 @@ document.getElementById('search-input')?.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     renderListView();
 });
-
-document.querySelectorAll('.filter-chip').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        activeCategoryFilter = e.currentTarget.getAttribute('data-filter');
-
-        // Uppdatera knapparnas utseende
-        document.querySelectorAll('.filter-chip').forEach(b => {
-            b.classList.remove('bg-emerald-600', 'text-white', 'shadow-sm');
-            b.classList.add('bg-slate-100', 'text-slate-600');
-        });
-        e.currentTarget.classList.remove('bg-slate-100', 'text-slate-600');
-        e.currentTarget.classList.add('bg-emerald-600', 'text-white', 'shadow-sm');
-
-        renderListView();
-    });
-});
-
-
-
 
 // Uppdaterad renderListView med filtrering
 function renderListView() {
@@ -853,7 +892,6 @@ function renderFilterChips() {
     const chipsContainer = document.getElementById('filter-chips');
     if (!chipsContainer) return;
 
-    // Skapa en unik lista av alla kategorier som faktiskt finns sparade
     const uniqueCategories = Array.from(
         new Set(savedPlaces.map(item => item.category || item.categoryGroup || 'Övrigt'))
     ).filter(Boolean);
@@ -885,15 +923,15 @@ function renderFilterChips() {
 
     chipsContainer.innerHTML = html;
 
-    // Koppla klickhändelser till alla knapparna
+    // Koppla klickhändelser till filterknapparna
     chipsContainer.querySelectorAll('.filter-chip').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            activeCategoryFilter = e.currentTarget.getAttribute('data-filter');
-            renderFilterChips(); // Rita om knapparna så rätt knapp blir grön
-            renderListView();   // Filtrera listan
+            const selectedCat = e.currentTarget.getAttribute('data-filter');
+            applyCategoryFilter(selectedCat); // Filtrerar både karta & lista
         });
     });
 }
+
 
 
 
@@ -904,23 +942,19 @@ const btnHamburger = document.getElementById('btn-hamburger');
 const hamburgerMenu = document.getElementById('hamburger-menu');
 
 if (btnHamburger && hamburgerMenu) {
+    // Öppna/stäng menyn vid klick på hamburgarknappen
     btnHamburger.addEventListener('click', (e) => {
         e.stopPropagation();
         hamburgerMenu.classList.toggle('hidden');
     });
 
+    // Stäng menyn om man klickar utanför
     document.addEventListener('click', () => {
         hamburgerMenu.classList.add('hidden');
     });
-
-    if (!document.getElementById('btn-export-gpx')) {
-        const gpxBtn = document.createElement('button');
-        gpxBtn.id = 'btn-export-gpx';
-        gpxBtn.className = "w-full text-left flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition border-t border-slate-100";
-        gpxBtn.innerHTML = `<span>📥</span> Exportera till GPX`;
-        gpxBtn.addEventListener('click', () => {
-            exportToGPX(savedPlaces);
-        });
-        hamburgerMenu.insertBefore(gpxBtn, hamburgerMenu.lastElementChild);
-    }
 }
+
+// Koppla klickhändelsen direkt till knappen från HTML
+document.getElementById('btn-export-gpx')?.addEventListener('click', () => {
+    exportToGPX(savedPlaces);
+});
