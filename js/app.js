@@ -6,6 +6,7 @@ import {
     SCRIPT_URL,
     CATEGORIES
 } from './config.js';
+
 import {
     initDB,
     saveMarker,
@@ -27,6 +28,8 @@ let userAccuracyCircle = null;
 let currentCoords = null;
 let currentAccuracy = 0;
 let currentPhotoBase64 = null;
+let activeCategoryFilter = 'all';
+let searchQuery = '';
 
 // Initiera kartan centrerad på Sverige
 const map = L.map('map', {
@@ -57,15 +60,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const loadedPlaces = [];
 
                     remoteData.forEach((item, index) => {
-                        // Kontrollera att latitud och longitud finns och inte är tomma
                         if (item.latitude === undefined && item.lat === undefined) return;
 
-                        const lat = Number(item.latitude !== undefined ? item.latitude: item.lat);
-                        const lng = Number(item.longitude !== undefined ? item.longitude: item.lng);
+                        const lat = Number(item.latitude !== undefined ? item.latitude : item.lat);
+                        const lng = Number(item.longitude !== undefined ? item.longitude : item.lng);
 
                         if (isNaN(lat) || isNaN(lng)) return;
 
-                        //
                         const formatted = {
                             id: String(item.id || item.Id || `marker_${Date.now()}_${index}`),
                             lat: lat,
@@ -79,7 +80,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                             syncStatus: 'synced'
                         };
 
-
                         loadedPlaces.push(formatted);
                         saveMarker(formatted);
                         addPlaceToMap(formatted);
@@ -88,8 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     savedPlaces = loadedPlaces;
                 }
             } catch (sheetErr) {
-                console.warn("Kunde inte hämta från Google Sheets:",
-                    sheetErr);
+                console.warn("Kunde inte hämta från Google Sheets:", sheetErr);
             }
         }
 
@@ -108,6 +107,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Uppdatera gränssnittet
         updateMarkerCount();
         renderListView();
+        renderFilterChips(); // Skapa filterknapparna dynamiskt
+
+        await syncPendingMarkers();
+    } catch (err) {
+        console.error("Fel vid laddning av markörer:", err);
+    }
+});
+
+
 
         await syncPendingMarkers();
     } catch (err) {
@@ -697,9 +705,32 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return d < 1 ? `${Math.round(d * 1000)} m`: `${d.toFixed(1)} km`;
 }
 
-// Globala variabler för filtertillstånd (läggs högt upp under Globalt tillstånd)
-let activeCategoryFilter = 'all';
-let searchQuery = '';
+
+
+// Lyssnare för sökfält och filterknappar
+document.getElementById('search-input')?.addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    renderListView();
+});
+
+document.querySelectorAll('.filter-chip').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        activeCategoryFilter = e.currentTarget.getAttribute('data-filter');
+
+        // Uppdatera knapparnas utseende
+        document.querySelectorAll('.filter-chip').forEach(b => {
+            b.classList.remove('bg-emerald-600', 'text-white', 'shadow-sm');
+            b.classList.add('bg-slate-100', 'text-slate-600');
+        });
+        e.currentTarget.classList.remove('bg-slate-100', 'text-slate-600');
+        e.currentTarget.classList.add('bg-emerald-600', 'text-white', 'shadow-sm');
+
+        renderListView();
+    });
+});
+
+
+
 
 // Uppdaterad renderListView med filtrering
 function renderListView() {
@@ -785,29 +816,9 @@ function renderListView() {
     }).join('');
 }
 
-// Lyssnare för sökfält och filterknappar
-document.getElementById('search-input')?.addEventListener('input', (e) => {
-    searchQuery = e.target.value;
-    renderListView();
-});
-
-document.querySelectorAll('.filter-chip').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        activeCategoryFilter = e.currentTarget.getAttribute('data-filter');
-
-        // Uppdatera knapparnas utseende
-        document.querySelectorAll('.filter-chip').forEach(b => {
-            b.classList.remove('bg-emerald-600', 'text-white', 'shadow-sm');
-            b.classList.add('bg-slate-100', 'text-slate-600');
-        });
-        e.currentTarget.classList.remove('bg-slate-100', 'text-slate-600');
-        e.currentTarget.classList.add('bg-emerald-600', 'text-white', 'shadow-sm');
-
-        renderListView();
-    });
-});
 
 
+// 
 const btnList = document.getElementById('btn-show-list');
 const btnMap = document.getElementById('btn-show-map');
 
@@ -843,6 +854,32 @@ if (btnMap) {
         setTimeout(() => map.invalidateSize(), 100);
     });
 }
+
+function renderFilterChips() {
+    const chipsContainer = document.getElementById('filter-chips');
+    if (!chipsContainer) return;
+
+    let html = `<button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${activeCategoryFilter === 'all' ? 'bg-emerald-600 text-white font-semibold shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">Alla</button>`;
+
+    html += CATEGORIES.map(cat => {
+        const isSelected = activeCategoryFilter === cat.name;
+        return `
+        <button data-filter="${cat.name}" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${isSelected ? 'bg-emerald-600 text-white font-semibold shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+            ${cat.name}
+        </button>`;
+    }).join('');
+
+    chipsContainer.innerHTML = html;
+
+    document.querySelectorAll('.filter-chip').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            activeCategoryFilter = e.currentTarget.getAttribute('data-filter');
+            renderFilterChips();
+            renderListView();
+        });
+    });
+}
+
 
 // -----------------------------------------------------------------
 // 8. Hamburgermeny & GPX Export
