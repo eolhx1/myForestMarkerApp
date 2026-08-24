@@ -626,23 +626,56 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }
 
+let currentHeading = null;
+const SMOOTHING_FACTOR = 0.15; // Mjukar upp rörelsen (0.05 - 0.2)
+const MIN_CHANGE = 2;          // Ignorera skakningar under 2 grader
+
 function handleOrientation(event) {
-    let heading = null;
+  // 1. Hämta grader från sensorn (passar både iOS och Android)
+  let rawHeading = null;
+  if (event.webkitCompassHeading) {
+    rawHeading = event.webkitCompassHeading; // iOS
+  } else if (event.alpha !== null) {
+    rawHeading = 360 - event.alpha;          // Android
+  }
 
-    if (event.webkitCompassHeading) {
-        heading = event.webkitCompassHeading;
-    } else if (event.alpha !== null) {
-        heading = 360 - event.alpha;
-    }
+  if (rawHeading === null) return;
 
-    if (heading !== null) {
-        currentHeading = heading;
-        const arrowEl = document.getElementById('user-heading-arrow');
-        if (arrowEl) {
-            arrowEl.style.transform = `rotate(${heading}deg)`;
-        }
-    }
+  // Första värdet som sätts
+  if (currentHeading === null) {
+    currentHeading = rawHeading;
+    updateMarkerRotation(currentHeading);
+    return;
+  }
+
+  // 2. Räkna ut kortaste vägen runt cirkeln (så den inte snurrar 350° fel håll)
+  let diff = rawHeading - currentHeading;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+
+  // 3. Ignorera mikro-skakningar
+  if (Math.abs(diff) < MIN_CHANGE) return;
+
+  // 4. Tillämpa lågpassfilter (utjämning)
+  currentHeading = currentHeading + (diff * SMOOTHING_FACTOR);
+  currentHeading = (currentHeading + 360) % 360;
+
+  // 5. Uppdatera markörens rotation
+  updateMarkerRotation(currentHeading);
 }
+
+// Hjälpfunktion för att rotera din markör/pil
+function updateMarkerRotation(heading) {
+  if (typeof userLocationMarker !== 'undefined' && userLocationMarker) {
+    const iconElement = userLocationMarker.getElement();
+    if (iconElement) {
+      iconElement.style.transformOrigin = 'center center';
+      const currentTransform = iconElement.style.transform.replace(/rotate\([^)]*\)/, '');
+      iconElement.style.transform = `${currentTransform} rotate(${heading}deg)`;
+    }
+  }
+}
+
 
 if (window.DeviceOrientationEvent) {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
