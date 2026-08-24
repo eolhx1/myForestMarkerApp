@@ -731,10 +731,10 @@ function renderListView() {
 
     // Filterlogik
     const filteredPlaces = savedPlaces.filter(item => {
-        const matchesCategory = activeCategoryFilter === 'all' || 
-            (item.category || item.categoryGroup) === activeCategoryFilter;
+        const itemCategory = item.category || item.categoryGroup || 'Övrigt';
+        const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
 
-        const term = searchQuery.toLowerCase();
+        const term = searchQuery.toLowerCase().trim();
         const matchesSearch = !term || 
             (item.title && item.title.toLowerCase().includes(term)) ||
             (item.description && item.description.toLowerCase().includes(term));
@@ -744,8 +744,8 @@ function renderListView() {
 
     if (filteredPlaces.length === 0) {
         container.innerHTML = `
-        <div class="p-8 text-center text-slate-400">
-            <p>${savedPlaces.length === 0 ? 'Inga sparade skogsmarkörer än.' : 'Inga markörer matchar din sökning.'}</p>
+        <div class="p-8 text-center text-slate-400 bg-white rounded-3xl border border-slate-100">
+            <p>${savedPlaces.length === 0 ? 'Inga sparade skogsmarkörer än.' : 'Inga markörer matchar din sökning eller filter.'}</p>
         </div>`;
         return;
     }
@@ -834,9 +834,11 @@ if (btnList) {
         document.getElementById('map-view')?.classList.add('hidden');
         document.getElementById('list-view')?.classList.remove('hidden');
         updateTabStyles(btnList, btnMap);
+        renderFilterChips(); // Skapa fräscha filterknappar baserat på sparade platser
         renderListView();
     });
 }
+
 
 if (btnMap) {
     btnMap.addEventListener('click', () => {
@@ -851,26 +853,48 @@ function renderFilterChips() {
     const chipsContainer = document.getElementById('filter-chips');
     if (!chipsContainer) return;
 
-    let html = `<button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${activeCategoryFilter === 'all' ? 'bg-emerald-600 text-white font-semibold shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">Alla</button>`;
+    // Skapa en unik lista av alla kategorier som faktiskt finns sparade
+    const uniqueCategories = Array.from(
+        new Set(savedPlaces.map(item => item.category || item.categoryGroup || 'Övrigt'))
+    ).filter(Boolean);
 
-    html += CATEGORIES.map(cat => {
-        const isSelected = activeCategoryFilter === cat.name;
+    let html = `
+        <button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${
+            activeCategoryFilter === 'all' 
+                ? 'bg-emerald-600 text-white font-semibold shadow-sm' 
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+        }">
+            Alla (${savedPlaces.length})
+        </button>
+    `;
+
+    html += uniqueCategories.map(cat => {
+        const count = savedPlaces.filter(p => (p.category || p.categoryGroup || 'Övrigt') === cat).length;
+        const isSelected = activeCategoryFilter === cat;
+
         return `
-        <button data-filter="${cat.name}" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${isSelected ? 'bg-emerald-600 text-white font-semibold shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
-            ${cat.name}
-        </button>`;
+            <button data-filter="${cat}" class="filter-chip shrink-0 px-3 py-1.5 rounded-full transition ${
+                isSelected 
+                    ? 'bg-emerald-600 text-white font-semibold shadow-sm' 
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+            }">
+                ${cat} (${count})
+            </button>
+        `;
     }).join('');
 
     chipsContainer.innerHTML = html;
 
-    document.querySelectorAll('.filter-chip').forEach(btn => {
+    // Koppla klickhändelser till alla knapparna
+    chipsContainer.querySelectorAll('.filter-chip').forEach(btn => {
         btn.addEventListener('click', (e) => {
             activeCategoryFilter = e.currentTarget.getAttribute('data-filter');
-            renderFilterChips();
-            renderListView();
+            renderFilterChips(); // Rita om knapparna så rätt knapp blir grön
+            renderListView();   // Filtrera listan
         });
     });
 }
+
 
 
 // -----------------------------------------------------------------
