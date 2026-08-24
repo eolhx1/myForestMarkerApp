@@ -115,14 +115,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-
-
-        await syncPendingMarkers();
-    } catch (err) {
-        console.error("Fel vid laddning av markörer:", err);
-    }
-});
-
 // -----------------------------------------------------------------
 // 1. Kartlager & Kartväljare
 // -----------------------------------------------------------------
