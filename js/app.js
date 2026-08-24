@@ -697,19 +697,37 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return d < 1 ? `${Math.round(d * 1000)} m`: `${d.toFixed(1)} km`;
 }
 
+// Globala variabler för filtertillstånd (läggs högt upp under Globalt tillstånd)
+let activeCategoryFilter = 'all';
+let searchQuery = '';
+
+// Uppdaterad renderListView med filtrering
 function renderListView() {
     const container = document.getElementById('list-container');
     if (!container) return;
 
-    if (savedPlaces.length === 0) {
+    // Filterlogik
+    const filteredPlaces = savedPlaces.filter(item => {
+        const matchesCategory = activeCategoryFilter === 'all' || 
+            (item.category || item.categoryGroup) === activeCategoryFilter;
+
+        const term = searchQuery.toLowerCase();
+        const matchesSearch = !term || 
+            (item.title && item.title.toLowerCase().includes(term)) ||
+            (item.description && item.description.toLowerCase().includes(term));
+
+        return matchesCategory && matchesSearch;
+    });
+
+    if (filteredPlaces.length === 0) {
         container.innerHTML = `
         <div class="p-8 text-center text-slate-400">
-        <p>Inga sparade skogsmarkörer än.</p>
+            <p>${savedPlaces.length === 0 ? 'Inga sparade skogsmarkörer än.' : 'Inga markörer matchar din sökning.'}</p>
         </div>`;
         return;
     }
 
-    container.innerHTML = savedPlaces.map(item => {
+    container.innerHTML = filteredPlaces.map(item => {
         const lat = Number(item.lat);
         const lng = Number(item.lng);
 
@@ -724,48 +742,71 @@ function renderListView() {
 
         return `
         <div class="bg-white rounded-3xl p-4 mb-4 border border-slate-100 shadow-sm space-y-3">
-        ${item.photo ? `
-        <div class="w-full h-40 rounded-2xl overflow-hidden mb-2">
-        <img src="${item.photo}" class="w-full h-full object-cover" alt="Skogsbild">
-        </div>
-        `: ''}
+            ${item.photo ? `
+            <div class="w-full h-40 rounded-2xl overflow-hidden mb-2">
+                <img src="${item.photo}" class="w-full h-full object-cover" alt="Skogsbild">
+            </div>
+            ` : ''}
 
-        <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
-        <span class="bg-amber-100/80 text-amber-900 px-3 py-1 rounded-full font-semibold text-xs inline-flex items-center gap-1 border border-amber-200/50">
-        📍 ${item.category || item.categoryGroup || 'Naturfynd'}
-        </span>
-        ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>`: ''}
-        </div>
+            <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
+                <span class="bg-amber-100/80 text-amber-900 px-3 py-1 rounded-full font-semibold text-xs inline-flex items-center gap-1 border border-amber-200/50">
+                    📍 ${item.category || item.categoryGroup || 'Naturfynd'}
+                </span>
+                ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>` : ''}
+            </div>
 
-        <div>
-        <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
-        ${item.description ? `
-        <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
-        "${item.description}"
-        </div>
-        `: ''}
-        </div>
+            <div>
+                <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
+                ${item.description ? `
+                <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
+                    "${item.description}"
+                </div>
+                ` : ''}
+            </div>
 
-        <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
-        <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
-        <span>${item.timestamp ? item.timestamp.slice(0, 10): ''}</span>
-        </div>
+            <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
+                <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+                <span>${item.timestamp ? item.timestamp.slice(0, 10) : ''}</span>
+            </div>
 
-        <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
-        <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
-        🌐 Earth
-        </a>
-        <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
-        🗺️ Maps
-        </a>
-        <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
-        🗑️
-        </button>
-        </div>
+            <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
+                <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
+                    🌐 Earth
+                </a>
+                <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
+                    🗺️ Maps
+                </a>
+                <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
+                    🗑️
+                </button>
+            </div>
         </div>
         `;
     }).join('');
 }
+
+// Lyssnare för sökfält och filterknappar
+document.getElementById('search-input')?.addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    renderListView();
+});
+
+document.querySelectorAll('.filter-chip').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        activeCategoryFilter = e.currentTarget.getAttribute('data-filter');
+
+        // Uppdatera knapparnas utseende
+        document.querySelectorAll('.filter-chip').forEach(b => {
+            b.classList.remove('bg-emerald-600', 'text-white', 'shadow-sm');
+            b.classList.add('bg-slate-100', 'text-slate-600');
+        });
+        e.currentTarget.classList.remove('bg-slate-100', 'text-slate-600');
+        e.currentTarget.classList.add('bg-emerald-600', 'text-white', 'shadow-sm');
+
+        renderListView();
+    });
+});
+
 
 const btnList = document.getElementById('btn-show-list');
 const btnMap = document.getElementById('btn-show-map');
