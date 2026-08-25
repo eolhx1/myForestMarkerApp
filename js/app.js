@@ -303,7 +303,7 @@ document.getElementById('btn-mark')?.addEventListener('click', () => {
         document.getElementById('modal-coords').innerText = `${currentCoords[0].toFixed(6)}, ${currentCoords[1].toFixed(6)}`;
         const accText = `±${Math.round(currentAccuracy)}m`;
         document.getElementById('modal-accuracy').innerText = accText;
-        document.getElementById('modal-footer-gps').innerText = accText;
+//        document.getElementById('modal-footer-gps').innerText = accText;
 
         if (!selectedCategory) selectedCategory = CATEGORIES[0];
         document.getElementById('input-title').value = selectedCategory.name;
