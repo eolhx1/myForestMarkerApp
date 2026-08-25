@@ -2,11 +2,31 @@
 // filename: app.js
 //
 
-import { SCRIPT_URL, CATEGORIES } from './config.js';
-import { saveMarkerLocally, compressImage, getLocalMarkers } from './storage.js';
-import { initAutoSync, syncPendingMarkers } from './sync.js';
-import { exportToGPX } from './exporter.js';
-import { deleteMarker } from './db.js';
+//
+// filename: app.js
+//
+
+
+
+import {
+    SCRIPT_URL,
+    CATEGORIES
+} from './config.js';
+import {
+    saveMarkerLocally,
+    compressImage,
+    getLocalMarkers
+} from './storage.js';
+import {
+    initAutoSync,
+    syncPendingMarkers
+} from './sync.js';
+import {
+    exportToGPX
+} from './exporter.js';
+import {
+    deleteMarker
+} from './db.js';
 
 // Initiera synk-lyssnaren direkt vid appstart
 initAutoSync();
@@ -54,8 +74,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     remoteData.forEach((item, index) => {
                         if (item.latitude === undefined && item.lat === undefined) return;
 
-                        const lat = Number(item.latitude !== undefined ? item.latitude : item.lat);
-                        const lng = Number(item.longitude !== undefined ? item.longitude : item.lng);
+                        const lat = Number(item.latitude !== undefined ? item.latitude: item.lat);
+                        const lng = Number(item.longitude !== undefined ? item.longitude: item.lng);
 
                         if (isNaN(lat) || isNaN(lng)) return;
 
@@ -79,7 +99,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     savedPlaces = loadedPlaces;
                 }
             } catch (sheetErr) {
-                console.warn("Kunde inte hämta från Google Sheets:", sheetErr);
+                console.warn("Kunde inte hämta från Google Sheets:",
+                    sheetErr);
             }
         }
 
@@ -110,18 +131,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 // 1. Kartlager & Kartväljare
 // -----------------------------------------------------------------
 const tileLayers = {
-    topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-        maxZoom: 17,
-        attribution: '© OpenTopoMap'
-    }),
-    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 18,
-        attribution: '© Esri'
-    }),
-    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-    })
+    topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        {
+            maxZoom: 17,
+            attribution: '© OpenTopoMap'
+        }),
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        {
+            maxZoom: 18,
+            attribution: '© Esri'
+        }),
+    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        })
 };
 
 let activeLayer = tileLayers.topo;
@@ -150,7 +174,9 @@ if (toggleBtn && menu) {
             activeLayer = tileLayers[layerKey];
             activeLayer.addTo(map);
 
-            const names = { topo: 'Skogstopo', satellite: 'Satellitvy', osm: 'Standardkarta' };
+            const names = {
+                topo: 'Skogstopo', satellite: 'Satellitvy', osm: 'Standardkarta'
+            };
             if (currentMapName) currentMapName.innerText = names[layerKey];
 
             document.querySelectorAll('.map-option-btn').forEach(b => {
@@ -176,11 +202,11 @@ const myLocationIcon = L.divIcon({
     className: 'my-location-marker',
     html: `
     <div style="position: relative; width: 32px; height: 32px;">
-      <div id="user-heading-arrow" style="position: absolute; top: 0; left: 0; width: 32px; height: 32px; transition: transform 0.2s ease-out; transform-origin: center center;">
-        <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
-          <path d="M12 2L19 21L12 17L5 21L12 2Z" fill="#2563eb" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-        </svg>
-      </div>
+    <div id="user-heading-arrow" style="position: absolute; top: 0; left: 0; width: 32px; height: 32px; transition: transform 0.2s ease-out; transform-origin: center center;">
+    <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
+    <path d="M12 2L19 21L12 17L5 21L12 2Z" fill="#2563eb" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+    </svg>
+    </div>
     </div>
     `,
     iconSize: [32, 32],
@@ -219,10 +245,10 @@ function renderCategoryGrid() {
         const isSelected = selectedCategory && cat.id === selectedCategory.id;
         return `
         <button data-id="${cat.id}" type="button" class="category-btn p-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition ${isSelected ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-sm': 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}">
-          <div class="flex items-center justify-center h-7 w-7">
-            ${cat.iconSvg}
-          </div>
-          <span class="text-[10px] leading-tight text-center">${cat.name}</span>
+        <div class="flex items-center justify-center h-7 w-7">
+        ${cat.iconSvg}
+        </div>
+        <span class="text-[10px] leading-tight text-center">${cat.name}</span>
         </button>
         `;
     }).join('');
@@ -239,15 +265,16 @@ function renderCategoryGrid() {
 }
 
 document.querySelectorAll('.amount-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        selectedAmount = e.currentTarget.getAttribute('data-amount');
-        document.querySelectorAll('.amount-btn').forEach(b => {
-            b.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
-            b.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
+    btn.addEventListener('click',
+        (e) => {
+            selectedAmount = e.currentTarget.getAttribute('data-amount');
+            document.querySelectorAll('.amount-btn').forEach(b => {
+                b.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+                b.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
+            });
+            e.currentTarget.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
+            e.currentTarget.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
         });
-        e.currentTarget.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
-        e.currentTarget.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
-    });
 });
 
 const modal = document.getElementById('save-modal');
@@ -297,16 +324,22 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
         }
 
         const newMarkerData = {
+            id: 'marker_' + Date.now(),
             title: title,
             categoryGroup: catGroup,
             category: catGroup,
-            description: notes ? `${selectedAmount}. ${notes}` : selectedAmount,
+            description: notes ? `${selectedAmount}. ${notes}`: selectedAmount,
             amount: selectedAmount,
             notes: notes,
             lat: currentCoords[0],
             lng: currentCoords[1],
-            photo: photoBase64
+            photo: photoBase64,
+            timestamp: new Date().toISOString(),
+            synced: false,
+            // <-- Tydlig flagga för offline-synk
+            syncStatus: 'pending' // <-- Kompatibel med båda dina synk-kontroller
         };
+
 
         // 1. Spara lokalt DIREKT (Fungerar offline)
         const savedMarker = saveMarkerLocally(newMarkerData);
@@ -348,12 +381,18 @@ window.removeCurrentMarker = async function(id) {
         await deleteMarker(id);
 
         if (navigator.onLine) {
+            // Skicka radering direkt om online
             fetch(SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ action: 'delete', id: id })
             }).catch(err => console.warn("Kunde inte radera från Sheets:", err));
+        } else {
+            // Spara i raderingskö om offline
+            const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
+            pendingDeletes.push(id);
+            localStorage.setItem('pendingDeletes', JSON.stringify(pendingDeletes));
         }
 
         if (markersMap[id]) {
@@ -380,32 +419,32 @@ function createPopupContent(place, placeId) {
 
     return `
     <div class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200" style="width: 280px; max-width: calc(100vw - 40px);">
-      ${place.photo ? `
-      <div class="w-full h-32 overflow-hidden">
-        <img src="${place.photo}" class="w-full h-full object-cover" alt="Skogsbild">
-      </div>
-      `: ''}
-      <div class="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="font-bold text-base text-emerald-900 leading-tight pr-2">${place.title}</h3>
-        <button onclick="window.removeCurrentMarker('${placeId}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">🗑️</button>
-      </div>
-      <div class="px-3 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold">
-        <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">${place.category || place.categoryGroup}</span>
-      </div>
-      <div class="px-3 py-2 text-xs text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
-        "${place.description || ''}"
-      </div>
-      <div class="p-3 space-y-1 text-xs text-slate-700">
-        <div>📍 <span class="font-mono text-slate-600">${latNum.toFixed(5)}, ${lngNum.toFixed(5)}</span></div>
-        <div>🕐 <strong>Tid:</strong> ${place.timestamp ? place.timestamp.slice(0, 10): ''}</div>
-      </div>
-      <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex gap-2">
-        <button onclick="window.toggleNavigation('${placeId}')" class="flex-1 text-center bg-blue-600 text-white py-1.5 rounded-xl text-xs font-semibold hover:bg-blue-700 transition">
-          🧭 Gå hit
-        </button>
-        <a href="${googleEarthUrl}" target="_blank" class="py-1.5 px-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold">🌐 Earth</a>
-        <a href="${googleMapsUrl}" target="_blank" class="py-1.5 px-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold">🗺️ Maps</a>
-      </div>
+    ${place.photo ? `
+    <div class="w-full h-32 overflow-hidden">
+    <img src="${place.photo}" class="w-full h-full object-cover" alt="Skogsbild">
+    </div>
+    `: ''}
+    <div class="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+    <h3 class="font-bold text-base text-emerald-900 leading-tight pr-2">${place.title}</h3>
+    <button onclick="window.removeCurrentMarker('${placeId}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">🗑️</button>
+    </div>
+    <div class="px-3 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold">
+    <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">${place.category || place.categoryGroup}</span>
+    </div>
+    <div class="px-3 py-2 text-xs text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
+    "${place.description || ''}"
+    </div>
+    <div class="p-3 space-y-1 text-xs text-slate-700">
+    <div>📍 <span class="font-mono text-slate-600">${latNum.toFixed(5)}, ${lngNum.toFixed(5)}</span></div>
+    <div>🕐 <strong>Tid:</strong> ${place.timestamp ? place.timestamp.slice(0, 10): ''}</div>
+    </div>
+    <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex gap-2">
+    <button onclick="window.toggleNavigation('${placeId}')" class="flex-1 text-center bg-blue-600 text-white py-1.5 rounded-xl text-xs font-semibold hover:bg-blue-700 transition">
+    🧭 Gå hit
+    </button>
+    <a href="${googleEarthUrl}" target="_blank" class="py-1.5 px-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold">🌐 Earth</a>
+    <a href="${googleMapsUrl}" target="_blank" class="py-1.5 px-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold">🗺️ Maps</a>
+    </div>
     </div>
     `;
 }
@@ -425,18 +464,18 @@ function addPlaceToMap(place) {
         className: 'custom-map-pin',
         html: `
         <div style="
-          background: white;
-          border: 2px solid #059669;
-          border-radius: 50%;
-          width: 34px;
-          height: 34px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        background: white;
+        border: 2px solid #059669;
+        border-radius: 50%;
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         ">
-          ${iconEmoji}
+        ${iconEmoji}
         </div>
         `,
         iconSize: [34, 34],
@@ -444,9 +483,11 @@ function addPlaceToMap(place) {
         popupAnchor: [0, -18]
     });
 
-    const marker = L.marker([Number(place.lat), Number(place.lng)], { icon: customIcon });
+    const marker = L.marker([Number(place.lat), Number(place.lng)], {
+        icon: customIcon
+    });
     marker.bindPopup(createPopupContent(place, place.id));
-    
+
     const itemCategory = place.category || place.categoryGroup || 'Övrigt';
     const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
 
@@ -475,8 +516,13 @@ function getCategoryIcon(place) {
 // 6. GPS-spårning
 // -----------------------------------------------------------------
 function updatePosition(position, autoCenter = false) {
-    const { latitude, longitude, accuracy } = position.coords;
-    currentCoords = [latitude, longitude];
+    const {
+        latitude,
+        longitude,
+        accuracy
+    } = position.coords;
+    currentCoords = [latitude,
+        longitude];
     currentAccuracy = accuracy;
 
     const accText = `±${Math.round(accuracy)}m`;
@@ -509,7 +555,8 @@ function updatePosition(position, autoCenter = false) {
     if (activeNavMarkerId && savedPlaces.length > 0) {
         const target = savedPlaces.find(p => String(p.id) === String(activeNavMarkerId));
         if (target) {
-            const targetCoords = [Number(target.lat), Number(target.lng)];
+            const targetCoords = [Number(target.lat),
+                Number(target.lng)];
             if (navLine) {
                 navLine.setLatLngs([[latitude, longitude], targetCoords]);
             } else {
@@ -542,7 +589,8 @@ window.toggleNavigation = function(id) {
         activeNavMarkerId = id;
         const target = savedPlaces.find(p => String(p.id) === String(id));
         if (target && currentCoords) {
-            const targetCoords = [Number(target.lat), Number(target.lng)];
+            const targetCoords = [Number(target.lat),
+                Number(target.lng)];
             if (navLine) map.removeLayer(navLine);
 
             navLine = L.polyline([currentCoords, targetCoords], {
@@ -570,12 +618,16 @@ if ('geolocation' in navigator) {
             initialCenter = true;
         },
         (err) => console.warn(err.message),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
+        {
+            enableHighAccuracy: true, timeout: 10000, maximumAge: 2000
+        }
     );
 }
 
 document.getElementById('btn-recenter')?.addEventListener('click', () => {
-    if (currentCoords) map.flyTo(currentCoords, 16, { animate: true, duration: 1.5 });
+    if (currentCoords) map.flyTo(currentCoords, 16, {
+        animate: true, duration: 1.5
+    });
 });
 
 if ('serviceWorker' in navigator) {
@@ -658,7 +710,7 @@ function applyCategoryFilter(category) {
     Object.keys(markersMap).forEach(id => {
         const marker = markersMap[id];
         const place = savedPlaces.find(p => String(p.id) === String(id));
-        
+
         if (!place) return;
 
         const itemCategory = place.category || place.categoryGroup || 'Övrigt';
@@ -707,9 +759,9 @@ function renderListView() {
         const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
 
         const term = searchQuery.toLowerCase().trim();
-        const matchesSearch = !term || 
-            (item.title && item.title.toLowerCase().includes(term)) ||
-            (item.description && item.description.toLowerCase().includes(term));
+        const matchesSearch = !term ||
+        (item.title && item.title.toLowerCase().includes(term)) ||
+        (item.description && item.description.toLowerCase().includes(term));
 
         return matchesCategory && matchesSearch;
     });
@@ -717,7 +769,7 @@ function renderListView() {
     if (filteredPlaces.length === 0) {
         container.innerHTML = `
         <div class="p-8 text-center text-slate-400 bg-white rounded-3xl border border-slate-100">
-            <p>${savedPlaces.length === 0 ? 'Inga sparade skogsmarkörer än.' : 'Inga markörer matchar din sökning eller filter.'}</p>
+        <p>${savedPlaces.length === 0 ? 'Inga sparade skogsmarkörer än.': 'Inga markörer matchar din sökning eller filter.'}</p>
         </div>`;
         return;
     }
@@ -737,44 +789,44 @@ function renderListView() {
 
         return `
         <div class="bg-white rounded-3xl p-4 mb-4 border border-slate-100 shadow-sm space-y-3">
-            ${item.photo ? `
-            <div class="w-full h-40 rounded-2xl overflow-hidden mb-2">
-                <img src="${item.photo}" class="w-full h-full object-cover" alt="Skogsbild">
-            </div>
-            ` : ''}
+        ${item.photo ? `
+        <div class="w-full h-40 rounded-2xl overflow-hidden mb-2">
+        <img src="${item.photo}" class="w-full h-full object-cover" alt="Skogsbild">
+        </div>
+        `: ''}
 
-            <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
-                <span class="bg-amber-100/80 text-amber-900 px-3 py-1 rounded-full font-semibold text-xs inline-flex items-center gap-1 border border-amber-200/50">
-                    📍 ${item.category || item.categoryGroup || 'Naturfynd'}
-                </span>
-                ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>` : ''}
-            </div>
+        <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
+        <span class="bg-amber-100/80 text-amber-900 px-3 py-1 rounded-full font-semibold text-xs inline-flex items-center gap-1 border border-amber-200/50">
+        📍 ${item.category || item.categoryGroup || 'Naturfynd'}
+        </span>
+        ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>`: ''}
+        </div>
 
-            <div>
-                <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
-                ${item.description ? `
-                <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
-                    "${item.description}"
-                </div>
-                ` : ''}
-            </div>
+        <div>
+        <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
+        ${item.description ? `
+        <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
+        "${item.description}"
+        </div>
+        `: ''}
+        </div>
 
-            <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
-                <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
-                <span>${item.timestamp ? item.timestamp.slice(0, 10) : ''}</span>
-            </div>
+        <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
+        <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+        <span>${item.timestamp ? item.timestamp.slice(0, 10): ''}</span>
+        </div>
 
-            <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
-                <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
-                    🌐 Earth
-                </a>
-                <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
-                    🗺️ Maps
-                </a>
-                <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
-                    🗑️
-                </button>
-            </div>
+        <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
+        <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
+        🌐 Earth
+        </a>
+        <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
+        🗺️ Maps
+        </a>
+        <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
+        🗑️
+        </button>
+        </div>
         </div>
         `;
     }).join('');
@@ -826,13 +878,12 @@ function renderFilterChips() {
     ).filter(Boolean);
 
     let html = `
-        <button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${
-            activeCategoryFilter === 'all' 
-                ? 'bg-emerald-600 text-white font-semibold shadow-sm' 
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-        }">
-            Alla (${savedPlaces.length})
-        </button>
+    <button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${
+    activeCategoryFilter === 'all'
+    ? 'bg-emerald-600 text-white font-semibold shadow-sm': 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+    }">
+    Alla (${savedPlaces.length})
+    </button>
     `;
 
     html += uniqueCategories.map(cat => {
@@ -840,13 +891,12 @@ function renderFilterChips() {
         const isSelected = activeCategoryFilter === cat;
 
         return `
-            <button data-filter="${cat}" class="filter-chip shrink-0 px-3 py-1.5 rounded-full transition ${
-                isSelected 
-                    ? 'bg-emerald-600 text-white font-semibold shadow-sm' 
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-            }">
-                ${cat} (${count})
-            </button>
+        <button data-filter="${cat}" class="filter-chip shrink-0 px-3 py-1.5 rounded-full transition ${
+        isSelected
+        ? 'bg-emerald-600 text-white font-semibold shadow-sm': 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+        }">
+        ${cat} (${count})
+        </button>
         `;
     }).join('');
 
