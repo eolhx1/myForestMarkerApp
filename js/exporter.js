@@ -1,8 +1,6 @@
 //
 // filename: exporter.js 
-//
 // Funktion för att ladda ner sparade skogsställen som en .gpx-fil
-//
 
 export function exportToGPX(markers = []) {
   if (!markers || markers.length === 0) {
