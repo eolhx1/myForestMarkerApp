@@ -751,6 +751,12 @@ function updateMapFilterBadge() {
     }
 }
 
+// Återställ filter till "Alla" när användaren klickar på indikatorn
+document.getElementById('active-filter-badge')?.addEventListener('click', () => {
+    applyCategoryFilter('all');
+});
+
+
 // Gör så att klick på kartans filter-badge återställer till alla markörer
 document.getElementById('active-filter-badge')?.addEventListener('click', () => {
     applyCategoryFilter('all');
