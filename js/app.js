@@ -468,19 +468,64 @@ function addPlaceToMap(place) {
     markersMap[place.id] = marker;
 }
 
+// 1. Hämta SVG-ikonen direkt från CATEGORIES i config.js
 function getCategoryIcon(place) {
-    const cat = (place.category || place.categoryGroup || place.title || '').toLowerCase();
+    const categoryNameOrId = (place.category || place.categoryGroup || place.title || '').toLowerCase();
 
-    if (cat.includes('tält') || cat.includes('läger') || cat.includes('vindskydd')) return '⛺';
-    if (cat.includes('kantarell') || cat.includes('svamp')) return '🍄';
-    if (cat.includes('bär') || cat.includes('blåbär') || cat.includes('lingon')) return '🫐';
-    if (cat.includes('kupa') || cat.includes('bi') || cat.includes('bigård')) return '🐝';
-    if (cat.includes('jakt') || cat.includes('pass')) return '🦌';
-    if (cat.includes('fiske') || cat.includes('sjö')) return '🐟';
-    if (cat.includes('parkering') || cat.includes('bil')) return '🅿️';
+    // Sök i CATEGORIES efter matchande ID, namn eller grupp
+    const found = CATEGORIES.find(c => 
+        c.id.toLowerCase() === categoryNameOrId ||
+        c.name.toLowerCase() === categoryNameOrId ||
+        c.group.toLowerCase() === categoryNameOrId
+    );
 
-    return '📍';
+    // Returnera SVG:en om den hittas, annars en standard-nåls-SVG
+    return found ? found.iconSvg : `<svg viewBox="0 0 36 36" class="w-6 h-6"><circle cx="18" cy="14" r="7" fill="#EF4444"/><path fill="#DC2626" d="M18 21l-5 11h10l-5-11z"/><circle cx="18" cy="14" r="3" fill="#FFFFFF"/></svg>`;
 }
+
+// 2. Uppdatera addPlaceToMap så att den renderar SVG-koden korrekt
+function addPlaceToMap(place) {
+    if (markersMap[place.id]) {
+        map.removeLayer(markersMap[place.id]);
+    }
+
+    const svgIconHtml = getCategoryIcon(place);
+
+    const customIcon = L.divIcon({
+        className: 'custom-map-pin',
+        html: `
+        <div style="
+          background: white;
+          border: 2px solid #059669;
+          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        ">
+          ${svgIconHtml}
+        </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -18]
+    });
+
+    const marker = L.marker([Number(place.lat), Number(place.lng)], { icon: customIcon });
+    marker.bindPopup(createPopupContent(place));
+
+    const itemCategory = place.category || place.categoryGroup || 'Övrigt';
+    const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+
+    if (isVisible) {
+        marker.addTo(map);
+    }
+
+    markersMap[place.id] = marker;
+}
+
 
 // -----------------------------------------------------------------
 // 6. GPS-spårning
