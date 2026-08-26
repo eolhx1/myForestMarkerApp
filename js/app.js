@@ -411,44 +411,45 @@ window.removeCurrentMarker = async function(id) {
 };
 
 
-function createPopupContent(place, placeId) {
-    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
-    const googleEarthUrl = `https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r`;
+// Hitta funktionen som skapar popup-innehållet i app.js
+function createPopupContent(place) {
+  return `
+    <div class="p-1 pr-6">
+      <div class="flex items-center justify-between gap-2 mb-2 pr-2">
+        <h3 class="font-bold text-slate-900 text-base leading-tight">${place.title}</h3>
+        <button onclick="removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
+          🗑️
+        </button>
+      </div>
 
-    const latNum = Number(place.lat) || 0;
-    const lngNum = Number(place.lng) || 0;
+      <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-medium px-2.5 py-0.5 rounded-full mb-2">
+        ${place.category || 'Svamp'}
+      </span>
 
-    return `
-    <div class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-200" style="width: 280px; max-width: calc(100vw - 40px);">
-    ${place.photo ? `
-    <div class="w-full h-32 overflow-hidden">
-    <img src="${place.photo}" class="w-full h-full object-cover" alt="Skogsbild">
+      <p class="text-xs text-slate-500 italic mb-3">
+        "${place.note || 'Inga anteckningar angivna.'}"
+      </p>
+
+      <div class="text-xs text-slate-500 space-y-1 mb-3">
+        <div>📍 ${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}</div>
+        <div>⏱️ <b>Tid:</b> ${place.date || ''}</div>
+      </div>
+
+      <div class="flex gap-1.5 pt-1">
+        <a href="https://maps.google.com/?q=${place.lat},${place.lng}" target="_blank" class="flex-1 text-center bg-blue-600 text-white text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-blue-700 transition">
+          🧭 Gå hit
+        </a>
+        <a href="https://zoom.earth/#view=${place.lat},${place.lng},18z" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+          🌐 Earth
+        </a>
+        <a href="geo:${place.lat},${place.lng}" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+          🗺️ Maps
+        </a>
+      </div>
     </div>
-    `: ''}
-    <div class="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-    <h3 class="font-bold text-base text-emerald-900 leading-tight pr-2">${place.title}</h3>
-    <button onclick="window.removeCurrentMarker('${placeId}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">🗑️</button>
-    </div>
-    <div class="px-3 py-1.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold">
-    <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">${place.category || place.categoryGroup}</span>
-    </div>
-    <div class="px-3 py-2 text-xs text-slate-600 bg-slate-50/50 italic border-y border-slate-100">
-    "${place.description || ''}"
-    </div>
-    <div class="p-3 space-y-1 text-xs text-slate-700">
-    <div>📍 <span class="font-mono text-slate-600">${latNum.toFixed(5)}, ${lngNum.toFixed(5)}</span></div>
-    <div>🕐 <strong>Tid:</strong> ${place.timestamp ? place.timestamp.slice(0, 10): ''}</div>
-    </div>
-    <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex gap-2">
-    <button onclick="window.toggleNavigation('${placeId}')" class="flex-1 text-center bg-blue-600 text-white py-1.5 rounded-xl text-xs font-semibold hover:bg-blue-700 transition">
-    🧭 Gå hit
-    </button>
-    <a href="${googleEarthUrl}" target="_blank" class="py-1.5 px-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold">🌐 Earth</a>
-    <a href="${googleMapsUrl}" target="_blank" class="py-1.5 px-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold">🗺️ Maps</a>
-    </div>
-    </div>
-    `;
+  `;
 }
+
 
 function updateMarkerCount() {
     document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
