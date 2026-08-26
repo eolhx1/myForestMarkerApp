@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateMarkerCount();
         renderListView();
         renderFilterChips();
+        updateMapFilterBadge();
 
         try { await syncPendingMarkers(); } catch(e) {}
     } catch (err) {
@@ -385,8 +386,17 @@ function createPopupContent(place) {
 }
 
 function updateMarkerCount() {
-    document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
+    // Räkna endast de platser som matchar det aktiva filtret
+    const visiblePlaces = savedPlaces.filter(item => {
+        const itemCategory = item.category || item.categoryGroup || 'Övrigt';
+        return activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+    });
+
+    document.querySelectorAll('.marker-count-val').forEach(el => {
+        el.innerText = visiblePlaces.length;
+    });
 }
+
 
 // Slår upp SVG-ikonen från CATEGORIES (kollar först exakt fyndnamn, sedan kategori)
 function getCategoryIcon(place) {
@@ -615,6 +625,7 @@ function applyCategoryFilter(category) {
     renderFilterChips();
     renderListView();
     updateMapFilterBadge();
+    updateMarkerCount();
 }
 
 function updateMapFilterBadge() {
