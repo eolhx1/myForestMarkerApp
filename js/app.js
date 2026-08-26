@@ -1,13 +1,3 @@
-//
-// filename: app.js
-//
-
-//
-// filename: app.js
-//
-
-
-
 import {
     SCRIPT_URL,
     CATEGORIES
@@ -99,8 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     savedPlaces = loadedPlaces;
                 }
             } catch (sheetErr) {
-                console.warn("Kunde inte hämta från Google Sheets:",
-                    sheetErr);
+                console.warn("Kunde inte hämta från Google Sheets:", sheetErr);
             }
         }
 
@@ -336,21 +325,16 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
             photo: photoBase64,
             timestamp: new Date().toISOString(),
             synced: false,
-            // <-- Tydlig flagga för offline-synk
-            syncStatus: 'pending' // <-- Kompatibel med båda dina synk-kontroller
+            syncStatus: 'pending'
         };
 
-
-        // 1. Spara lokalt DIREKT (Fungerar offline)
         const savedMarker = saveMarkerLocally(newMarkerData);
 
-        // 2. Uppdatera listor och karta
         savedPlaces.push(savedMarker);
         addPlaceToMap(savedMarker);
         updateMarkerCount();
         renderListView();
 
-        // 3. Återställ formulär & stäng modal
         currentPhotoBase64 = null;
         document.getElementById('photo-preview-container')?.classList.add('hidden');
         const notesInput = document.getElementById('input-notes');
@@ -362,7 +346,6 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
             markersMap[savedMarker.id].openPopup();
         }
 
-        // 4. Försök synka i bakgrunden om mobiltäckning finns
         syncPendingMarkers();
 
     } catch (err) {
@@ -375,7 +358,6 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
 // 5. Markör & Kartvisning
 // -----------------------------------------------------------------
 window.removeCurrentMarker = async function(id) {
-    // Bytt ut confirm() mot anpassad modal
     const confirmed = await showConfirm("Vill du ta bort denna markör?", "Ta bort markör");
     if (!confirmed) return;
 
@@ -410,46 +392,46 @@ window.removeCurrentMarker = async function(id) {
     }
 };
 
-
-// Hitta funktionen som skapar popup-innehållet i app.js
 function createPopupContent(place) {
+  const noteText = place.description || place.notes || 'Inga anteckningar angivna.';
+  const dateText = place.timestamp ? place.timestamp.slice(0, 10) : '';
+
   return `
-    <div class="p-1 pr-6">
+    <div class="p-3 pr-6">
       <div class="flex items-center justify-between gap-2 mb-2 pr-2">
         <h3 class="font-bold text-slate-900 text-base leading-tight">${place.title}</h3>
-        <button onclick="removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
+        <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
           🗑️
         </button>
       </div>
 
       <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-medium px-2.5 py-0.5 rounded-full mb-2">
-        ${place.category || 'Svamp'}
+        ${place.category || place.categoryGroup || 'Svamp'}
       </span>
 
       <p class="text-xs text-slate-500 italic mb-3">
-        "${place.note || 'Inga anteckningar angivna.'}"
+        "${noteText}"
       </p>
 
       <div class="text-xs text-slate-500 space-y-1 mb-3">
-        <div>📍 ${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}</div>
-        <div>⏱️ <b>Tid:</b> ${place.date || ''}</div>
+        <div>📍 ${Number(place.lat).toFixed(5)}, ${Number(place.lng).toFixed(5)}</div>
+        ${dateText ? `<div>⏱️ <b>Tid:</b> ${dateText}</div>` : ''}
       </div>
 
       <div class="flex gap-1.5 pt-1">
-        <a href="https://maps.google.com/?q=${place.lat},${place.lng}" target="_blank" class="flex-1 text-center bg-blue-600 text-white text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-blue-700 transition">
+        <button onclick="window.toggleNavigation('${place.id}')" class="flex-1 text-center bg-blue-600 text-white text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-blue-700 transition">
           🧭 Gå hit
-        </a>
-        <a href="https://zoom.earth/#view=${place.lat},${place.lng},18z" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+        </button>
+        <a href="https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
           🌐 Earth
         </a>
-        <a href="geo:${place.lat},${place.lng}" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+        <a href="https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
           🗺️ Maps
         </a>
       </div>
     </div>
   `;
 }
-
 
 function updateMarkerCount() {
     document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
@@ -488,7 +470,7 @@ function addPlaceToMap(place) {
     const marker = L.marker([Number(place.lat), Number(place.lng)], {
         icon: customIcon
     });
-    marker.bindPopup(createPopupContent(place, place.id));
+    marker.bindPopup(createPopupContent(place));
 
     const itemCategory = place.category || place.categoryGroup || 'Övrigt';
     const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
@@ -523,8 +505,7 @@ function updatePosition(position, autoCenter = false) {
         longitude,
         accuracy
     } = position.coords;
-    currentCoords = [latitude,
-        longitude];
+    currentCoords = [latitude, longitude];
     currentAccuracy = accuracy;
 
     const accText = `±${Math.round(accuracy)}m`;
@@ -557,8 +538,7 @@ function updatePosition(position, autoCenter = false) {
     if (activeNavMarkerId && savedPlaces.length > 0) {
         const target = savedPlaces.find(p => String(p.id) === String(activeNavMarkerId));
         if (target) {
-            const targetCoords = [Number(target.lat),
-                Number(target.lng)];
+            const targetCoords = [Number(target.lat), Number(target.lng)];
             if (navLine) {
                 navLine.setLatLngs([[latitude, longitude], targetCoords]);
             } else {
@@ -591,8 +571,7 @@ window.toggleNavigation = function(id) {
         activeNavMarkerId = id;
         const target = savedPlaces.find(p => String(p.id) === String(id));
         if (target && currentCoords) {
-            const targetCoords = [Number(target.lat),
-                Number(target.lng)];
+            const targetCoords = [Number(target.lat), Number(target.lng)];
             if (navLine) map.removeLayer(navLine);
 
             navLine = L.polyline([currentCoords, targetCoords], {
@@ -933,12 +912,8 @@ document.getElementById('btn-export-gpx')?.addEventListener('click', () => {
     exportToGPX(savedPlaces);
 });
 
-
-
-
-
 // -----------------------------------------------------------------
-// 
+// 9. Bekräftelsemodal
 // -----------------------------------------------------------------
 function showConfirm(message, title = "Ta bort markör") {
     return new Promise((resolve) => {
