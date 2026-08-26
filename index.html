@@ -28,8 +28,136 @@
         height: 100%;
         width: 100%;
     }
-</style>
+    
+    
+    /* Modern styling för modaler/dialoger */
+    dialog {
+      border: none;
+      border-radius: 16px;
+      padding: 24px;
+      width: 90%;
+      max-width: 400px;
+      background: #ffffff;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      animation: modalFadeIn 0.2s ease-out;
+    }
+
+    /* Mörk tonad och suddig bakgrund bakom modalen */
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(4px);
+    }
+
+    /* Standard rubrik och text inuti modalen */
+    dialog h2, dialog h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 1.25rem;
+      color: #1a1a1a;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    /* Formulärfält och etiketter */
+    dialog label {
+      display: block;
+      margin-top: 10px;
+      margin-bottom: 4px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #555;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    dialog input, 
+    dialog select, 
+    dialog textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    dialog input:focus, 
+    dialog select:focus, 
+    dialog textarea:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    /* Layout för knapparna längst ner */
+    dialog form, 
+    dialog .buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 16px;
+    }
+
+    /* Knappsammansättning */
+    dialog button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s, transform 0.1s;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    dialog button:active {
+      transform: scale(0.97);
+    }
+
+    /* Avbryt/Stäng-knappar (ljusgrå) */
+    dialog button[type="cancel"],
+    dialog button.cancel,
+    dialog button.btn-cancel {
+      background-color: #f3f4f6;
+      color: #4b5563;
+    }
+
+    dialog button[type="cancel"]:hover,
+    dialog button.cancel:hover,
+    dialog button.btn-cancel:hover {
+      background-color: #e5e7eb;
+    }
+
+    /* Spara/Bekräfta-knappar (blå) */
+    dialog button[type="submit"],
+    dialog button.save,
+    dialog button.btn-save,
+    dialog button.btn-primary {
+      background-color: #2563eb;
+      color: #ffffff;
+    }
+
+    dialog button[type="submit"]:hover,
+    dialog button.save:hover,
+    dialog button.btn-save:hover,
+    dialog button.btn-primary:hover {
+      background-color: #1d4ed8;
+    }
+
+    /* Animation för modalen */
+    @keyframes modalFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+  </style>
 </head>
+
 
 <body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
 
@@ -292,6 +420,30 @@ WGS84 GPS-koordinater
 </div>
 </div>
 </div>
+
+
+<!-- Custom Confirm Modal -->
+<div id="confirm-modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 transform transition-all space-y-4">
+    <div class="text-center space-y-2">
+      <div class="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto text-xl">
+        🗑️
+      </div>
+      <h3 id="confirm-modal-title" class="font-bold text-slate-900 text-lg">Ta bort markör</h3>
+      <p id="confirm-modal-msg" class="text-xs text-slate-500 leading-relaxed">Är du säker på att du vill ta bort denna markör? Det går inte att ångra.</p>
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button id="confirm-modal-cancel" class="flex-1 py-2.5 bg-slate-100 text-slate-700 font-semibold text-xs rounded-xl hover:bg-slate-200 transition">
+        Avbryt
+      </button>
+      <button id="confirm-modal-ok" class="flex-1 py-2.5 bg-red-600 text-white font-semibold text-xs rounded-xl hover:bg-red-700 transition shadow-sm">
+        Ta bort
+      </button>
+    </div>
+  </div>
+</div>
+
+
 
 </body>
 </html>
