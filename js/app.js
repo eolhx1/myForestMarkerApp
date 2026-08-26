@@ -393,22 +393,21 @@ window.removeCurrentMarker = async function(id) {
 };
 
 function createPopupContent(place) {
-  // Säkra att lat och lng är nummer
-  const latNum = Number(place.lat || place.latitude || 0);
-  const lngNum = Number(place.lng || place.longitude || 0);
-
+  // Säkra att lat och lng hanteras som nummer även om de kommer som strängar
+  const latNum = Number(place.lat);
+  const lngNum = Number(place.lng);
   const latFormatted = !isNaN(latNum) ? latNum.toFixed(5) : '0.00000';
   const lngFormatted = !isNaN(lngNum) ? lngNum.toFixed(5) : '0.00000';
 
-  // Säkra fälten för anteckning, kategori och datum
+  // Säkra fältnamn så att de matchar både 'note', 'notes' och 'description'
   const noteText = place.description || place.notes || place.note || 'Inga anteckningar angivna.';
-  const categoryText = place.category || place.categoryGroup || 'Övrigt';
+  const categoryText = place.category || place.categoryGroup || 'Svamp';
   const dateText = place.timestamp ? place.timestamp.slice(0, 10) : (place.date || '');
 
   return `
-    <div class="p-3 pr-6">
+    <div class="p-1 pr-6">
       <div class="flex items-center justify-between gap-2 mb-2 pr-2">
-        <h3 class="font-bold text-slate-900 text-base leading-tight">${place.title || 'Markör'}</h3>
+        <h3 class="font-bold text-slate-900 text-base leading-tight">${place.title || 'Skogsfynd'}</h3>
         <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
           🗑️
         </button>
@@ -428,19 +427,20 @@ function createPopupContent(place) {
       </div>
 
       <div class="flex gap-1.5 pt-1">
-        <button onclick="window.toggleNavigation('${place.id}')" class="flex-1 text-center bg-blue-600 text-white text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-blue-700 transition">
+        <a href="https://maps.google.com/?q=${latNum},${lngNum}" target="_blank" class="flex-1 text-center bg-blue-600 text-white text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-blue-700 transition">
           🧭 Gå hit
-        </button>
-        <a href="https://earth.google.com/web/@${latNum},${lngNum},0a,500d,35y,0h,0t,0r" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+        </a>
+        <a href="https://zoom.earth/#view=${latNum},${lngNum},18z" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
           🌐 Earth
         </a>
-        <a href="https://www.google.com/maps/search/?api=1&query=${latNum},${lngNum}" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+        <a href="geo:${latNum},${lngNum}" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
           🗺️ Maps
         </a>
       </div>
     </div>
   `;
 }
+
 
 
 function updateMarkerCount() {
