@@ -425,48 +425,6 @@ function updateMarkerCount() {
     document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
 }
 
-function addPlaceToMap(place) {
-    if (markersMap[place.id]) {
-        map.removeLayer(markersMap[place.id]);
-    }
-
-    const iconEmoji = getCategoryIcon(place);
-
-    const customIcon = L.divIcon({
-        className: 'custom-map-pin',
-        html: `
-        <div style="
-          background: white;
-          border: 2px solid #059669;
-          border-radius: 50%;
-          width: 34px;
-          height: 34px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        ">
-          ${iconEmoji}
-        </div>
-        `,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
-        popupAnchor: [0, -18]
-    });
-
-    const marker = L.marker([Number(place.lat), Number(place.lng)], { icon: customIcon });
-    marker.bindPopup(createPopupContent(place));
-
-    const itemCategory = place.category || place.categoryGroup || 'Övrigt';
-    const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
-
-    if (isVisible) {
-        marker.addTo(map);
-    }
-
-    markersMap[place.id] = marker;
-}
 
 // 1. Hämta SVG-ikonen direkt från CATEGORIES i config.js
 function getCategoryIcon(place) {
