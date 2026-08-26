@@ -393,20 +393,29 @@ window.removeCurrentMarker = async function(id) {
 };
 
 function createPopupContent(place) {
-  const noteText = place.description || place.notes || 'Inga anteckningar angivna.';
-  const dateText = place.timestamp ? place.timestamp.slice(0, 10) : '';
+  // Säkra att lat och lng är nummer
+  const latNum = Number(place.lat || place.latitude || 0);
+  const lngNum = Number(place.lng || place.longitude || 0);
+
+  const latFormatted = !isNaN(latNum) ? latNum.toFixed(5) : '0.00000';
+  const lngFormatted = !isNaN(lngNum) ? lngNum.toFixed(5) : '0.00000';
+
+  // Säkra fälten för anteckning, kategori och datum
+  const noteText = place.description || place.notes || place.note || 'Inga anteckningar angivna.';
+  const categoryText = place.category || place.categoryGroup || 'Övrigt';
+  const dateText = place.timestamp ? place.timestamp.slice(0, 10) : (place.date || '');
 
   return `
     <div class="p-3 pr-6">
       <div class="flex items-center justify-between gap-2 mb-2 pr-2">
-        <h3 class="font-bold text-slate-900 text-base leading-tight">${place.title}</h3>
-        <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
+        <h3 class="font-bold text-slate-900 text-base leading-tight">${place.title || 'Markör'}</h3>
+        <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
           🗑️
         </button>
       </div>
 
       <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-medium px-2.5 py-0.5 rounded-full mb-2">
-        ${place.category || place.categoryGroup || 'Svamp'}
+        ${categoryText}
       </span>
 
       <p class="text-xs text-slate-500 italic mb-3">
@@ -414,7 +423,7 @@ function createPopupContent(place) {
       </p>
 
       <div class="text-xs text-slate-500 space-y-1 mb-3">
-        <div>📍 ${Number(place.lat).toFixed(5)}, ${Number(place.lng).toFixed(5)}</div>
+        <div>📍 ${latFormatted}, ${lngFormatted}</div>
         ${dateText ? `<div>⏱️ <b>Tid:</b> ${dateText}</div>` : ''}
       </div>
 
@@ -422,16 +431,17 @@ function createPopupContent(place) {
         <button onclick="window.toggleNavigation('${place.id}')" class="flex-1 text-center bg-blue-600 text-white text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-blue-700 transition">
           🧭 Gå hit
         </button>
-        <a href="https://earth.google.com/web/@${place.lat},${place.lng},0a,500d,35y,0h,0t,0r" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+        <a href="https://earth.google.com/web/@${latNum},${lngNum},0a,500d,35y,0h,0t,0r" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
           🌐 Earth
         </a>
-        <a href="https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+        <a href="https://www.google.com/maps/search/?api=1&query=${latNum},${lngNum}" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
           🗺️ Maps
         </a>
       </div>
     </div>
   `;
 }
+
 
 function updateMarkerCount() {
     document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
