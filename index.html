@@ -173,7 +173,8 @@
 </head>
 
 
-<body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
+<body class="bg-slate-50 text-slate-800 flex flex-col h-[100dvh] w-screen overflow-hidden">
+
 
 <!-- Header -->
 <!-- Top Header med CSS Grid och Hamburgermeny -->
@@ -251,10 +252,10 @@ Skogsmarkören v1.0
 
 
 <!-- Main View Area -->
-<div class="relative flex-1 overflow-hidden">
+<div class="relative flex-1 h-full overflow-hidden">
 
 <!-- 1. KARTVY -->
-<div id="map-view" class="w-full h-full relative">
+<div id="map-view" class="w-full h-full relative overflow-hidden">
     <!-- Kartväljare Meny -->
     <div class="absolute top-3 left-3 z-[400] flex flex-col items-start gap-2">
         <button id="map-selector-toggle" class="bg-white/95 backdrop-blur border border-slate-200 text-slate-800 px-3 py-1.5 rounded-full shadow text-xs font-bold flex items-center gap-1.5 hover:bg-slate-50 transition">
