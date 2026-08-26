@@ -387,38 +387,39 @@ function createPopupContent(place) {
     const dateText = place.timestamp ? place.timestamp.slice(0, 10) : (place.date || '');
 
     return `
-    <div class="p-1 pr-6" style="min-width: 200px;">
-      <div class="flex items-center justify-between gap-2 mb-2 pr-2">
-        <h3 class="font-bold text-slate-900 text-base leading-tight">${place.title || 'Skogsfynd'}</h3>
-        <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
+    <div class="p-3" style="min-width: 210px; max-width: 240px;">
+      <div class="flex items-start justify-between gap-2 mb-2 pr-4">
+        <h3 class="font-bold text-slate-900 text-sm leading-snug">${place.title || 'Skogsfynd'}</h3>
+        <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
           🗑️
         </button>
       </div>
 
-      <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-medium px-2.5 py-0.5 rounded-full mb-2">
+      <span class="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-medium px-2.5 py-0.5 rounded-full mb-2">
         ${categoryText}
       </span>
 
-      <p class="text-xs text-slate-500 italic mb-3">
+      <p class="text-xs text-slate-600 italic mb-2 leading-relaxed">
         "${noteText}"
       </p>
 
-      <div class="text-xs text-slate-500 space-y-1 mb-3">
+      <div class="text-[11px] text-slate-500 space-y-0.5 mb-3 font-mono">
         <div>📍 ${latFormatted}, ${lngFormatted}</div>
-        ${dateText ? `<div>⏱️ <b>Tid:</b> ${dateText}</div>` : ''}
+        ${dateText ? `<div class="font-sans">⏱️ <b>Tid:</b> ${dateText}</div>` : ''}
       </div>
 
-      <div class="flex gap-1.5 pt-1">
-        <a href="https://maps.google.com/?q=${latNum},${lngNum}" target="_blank" class="flex-1 text-center bg-blue-600 text-white text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-blue-700 transition">
+      <div class="flex gap-2 pt-1 border-t border-slate-100">
+        <a href="https://maps.google.com/?q=${latNum},${lngNum}" target="_blank" class="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white !text-white text-xs py-2 px-2 rounded-xl font-semibold transition shadow-sm flex items-center justify-center gap-1 decoration-none">
           🧭 Gå hit
         </a>
-        <a href="https://zoom.earth/#view=${latNum},${lngNum},18z" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
+        <a href="https://zoom.earth/#view=${latNum},${lngNum},18z" target="_blank" class="flex-1 text-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-2 px-2 rounded-xl font-semibold transition flex items-center justify-center gap-1 decoration-none">
           🌐 Earth
         </a>
       </div>
     </div>
   `;
 }
+
 
 function updateMarkerCount() {
     document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
