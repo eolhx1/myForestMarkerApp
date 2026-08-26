@@ -862,3 +862,75 @@ if (btnHamburger && hamburgerMenu) {
 document.getElementById('btn-export-gpx')?.addEventListener('click', () => {
     exportToGPX(savedPlaces);
 });
+
+// -----------------------------------------------------------------
+// 9. Bekräftelsemodal (Promise-baserad)
+// -----------------------------------------------------------------
+function showConfirm(message, title = "Ta bort markör") {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        const msgEl = document.getElementById('confirm-modal-msg');
+        const titleEl = document.getElementById('confirm-modal-title');
+        const btnOk = document.getElementById('confirm-modal-ok');
+        const btnCancel = document.getElementById('confirm-modal-cancel');
+
+        if (!modal) {
+            resolve(confirm(message));
+            return;
+        }
+
+        if (msgEl) msgEl.innerText = message;
+        if (titleEl) titleEl.innerText = title;
+
+        modal.classList.remove('hidden');
+
+        const cleanup = () => {
+            modal.classList.add('hidden');
+            btnOk.removeEventListener('click', onOk);
+            btnCancel.removeEventListener('click', onCancel);
+        };
+
+        const onOk = () => { cleanup(); resolve(true); };
+        const onCancel = () => { cleanup(); resolve(false); };
+
+        btnOk.addEventListener('click', onOk);
+        btnCancel.addEventListener('click', onCancel);
+    });
+}
+
+// Global radera-funktion
+window.removeCurrentMarker = async function(id) {
+    const confirmed = await showConfirm("Vill du ta bort denna markör?", "Ta bort markör");
+    if (!confirmed) return;
+
+    try {
+        await deleteMarker(id);
+
+        if (navigator.onLine) {
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'delete', id: id })
+            }).catch(err => console.warn("Kunde inte radera från Sheets:", err));
+        } else {
+            const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
+            pendingDeletes.push(id);
+            localStorage.setItem('pendingDeletes', JSON.stringify(pendingDeletes));
+        }
+
+        if (markersMap[id]) {
+            map.removeLayer(markersMap[id]);
+            delete markersMap[id];
+        }
+
+        savedPlaces = savedPlaces.filter(p => String(p.id) !== String(id));
+        updateMarkerCount();
+        renderListView();
+        renderFilterChips();
+        map.closePopup();
+
+    } catch (err) {
+        alert("Kunde inte radera markören: " + (err.message || err));
+    }
+};
