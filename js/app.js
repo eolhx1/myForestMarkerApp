@@ -30,42 +30,6 @@ setTimeout(() => {
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Global radera-funktion (säkerställd att den finns direkt)
-window.removeCurrentMarker = async function(id) {
-    const confirmed = confirm("Vill du ta bort denna markör?");
-    if (!confirmed) return;
-
-    try {
-        await deleteMarker(id);
-
-        if (navigator.onLine) {
-            fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'delete', id: id })
-            }).catch(err => console.warn("Kunde inte radera från Sheets:", err));
-        } else {
-            const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
-            pendingDeletes.push(id);
-            localStorage.setItem('pendingDeletes', JSON.stringify(pendingDeletes));
-        }
-
-        if (markersMap[id]) {
-            map.removeLayer(markersMap[id]);
-            delete markersMap[id];
-        }
-
-        savedPlaces = savedPlaces.filter(p => String(p.id) !== String(id));
-        updateMarkerCount();
-        renderListView();
-        map.closePopup();
-
-    } catch (err) {
-        alert("Kunde inte radera markören: " + (err.message || err));
-    }
-};
-
 // Initiera och ladda sparade markörer när sidan har laddats
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -383,7 +347,7 @@ function createPopupContent(place) {
     const lngFormatted = !isNaN(lngNum) ? lngNum.toFixed(5) : '0.00000';
 
     const noteText = place.description || place.notes || place.note || 'Inga anteckningar angivna.';
-    const categoryText = place.category || place.categoryGroup || 'Svamp';
+    const categoryText = place.category || place.categoryGroup || 'Övrigt';
     const dateText = place.timestamp ? place.timestamp.slice(0, 10) : (place.date || '');
 
     return `
@@ -420,28 +384,24 @@ function createPopupContent(place) {
   `;
 }
 
-
 function updateMarkerCount() {
     document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
 }
 
-
-// 1. Hämta SVG-ikonen direkt från CATEGORIES i config.js
+// Slår upp SVG-ikonen från CATEGORIES (kollar först exakt fyndnamn, sedan kategori)
 function getCategoryIcon(place) {
-    const categoryNameOrId = (place.category || place.categoryGroup || place.title || '').toLowerCase();
+    const title = (place.title || '').toLowerCase().trim();
+    const category = (place.category || place.categoryGroup || '').toLowerCase().trim();
 
-    // Sök i CATEGORIES efter matchande ID, namn eller grupp
-    const found = CATEGORIES.find(c => 
-        c.id.toLowerCase() === categoryNameOrId ||
-        c.name.toLowerCase() === categoryNameOrId ||
-        c.group.toLowerCase() === categoryNameOrId
-    );
+    const titleMatch = CATEGORIES.find(c => c.name.toLowerCase() === title || c.id.toLowerCase() === title);
+    if (titleMatch) return titleMatch.iconSvg;
 
-    // Returnera SVG:en om den hittas, annars en standard-nåls-SVG
-    return found ? found.iconSvg : `<svg viewBox="0 0 36 36" class="w-6 h-6"><circle cx="18" cy="14" r="7" fill="#EF4444"/><path fill="#DC2626" d="M18 21l-5 11h10l-5-11z"/><circle cx="18" cy="14" r="3" fill="#FFFFFF"/></svg>`;
+    const categoryMatch = CATEGORIES.find(c => c.name.toLowerCase() === category || c.group.toLowerCase() === category);
+    if (categoryMatch) return categoryMatch.iconSvg;
+
+    return `<svg viewBox="0 0 36 36" class="w-6 h-6"><circle cx="18" cy="14" r="7" fill="#EF4444"/><path fill="#DC2626" d="M18 21l-5 11h10l-5-11z"/><circle cx="18" cy="14" r="3" fill="#FFFFFF"/></svg>`;
 }
 
-// 2. Uppdatera addPlaceToMap så att den renderar SVG-koden korrekt
 function addPlaceToMap(place) {
     if (markersMap[place.id]) {
         map.removeLayer(markersMap[place.id]);
@@ -483,7 +443,6 @@ function addPlaceToMap(place) {
 
     markersMap[place.id] = marker;
 }
-
 
 // -----------------------------------------------------------------
 // 6. GPS-spårning
