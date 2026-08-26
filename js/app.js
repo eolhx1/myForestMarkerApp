@@ -1,28 +1,15 @@
-import {
-    SCRIPT_URL,
-    CATEGORIES
-} from './config.js';
-import {
-    saveMarkerLocally,
-    compressImage,
-    getLocalMarkers
-} from './storage.js';
-import {
-    initAutoSync,
-    syncPendingMarkers
-} from './sync.js';
-import {
-    exportToGPX
-} from './exporter.js';
-import {
-    deleteMarker
-} from './db.js';
+import { SCRIPT_URL, CATEGORIES } from './config.js';
+import { saveMarkerLocally, compressImage, getLocalMarkers } from './storage.js';
+import { initAutoSync, syncPendingMarkers } from './sync.js';
+import { exportToGPX } from './exporter.js';
+import { deleteMarker } from './db.js';
 
 // Initiera synk-lyssnaren direkt vid appstart
-initAutoSync();
+try { initAutoSync(); } catch (e) { console.warn(e); }
 
 // Globalt tillstånd
-let selectedCategory = CATEGORIES[0];
+let safeCategories = Array.isArray(CATEGORIES) && CATEGORIES.length > 0 ? CATEGORIES : [{ id: 'default', name: 'Skogsfynd', group: 'Övrigt', iconSvg: '📍' }];
+let selectedCategory = safeCategories[0];
 let selectedAmount = 'Rikligt med fynd';
 let savedPlaces = [];
 let markersMap = {};
@@ -35,24 +22,66 @@ let activeCategoryFilter = 'all';
 let searchQuery = '';
 
 // Initiera kartan centrerad på Sverige
-const map = L.map('map', {
-    zoomControl: false
-}).setView([62.0, 15.0], 5);
+const map = L.map('map', { zoomControl: false }).setView([62.0, 15.0], 5);
 
 setTimeout(() => {
     map.invalidateSize();
 }, 100);
 
-L.control.zoom({
-    position: 'bottomright'
-}).addTo(map);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Global radera-funktion (säkerställd att den finns direkt)
+window.removeCurrentMarker = async function(id) {
+    const confirmed = confirm("Vill du ta bort denna markör?");
+    if (!confirmed) return;
+
+    try {
+        await deleteMarker(id);
+
+        if (navigator.onLine) {
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'delete', id: id })
+            }).catch(err => console.warn("Kunde inte radera från Sheets:", err));
+        } else {
+            const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
+            pendingDeletes.push(id);
+            localStorage.setItem('pendingDeletes', JSON.stringify(pendingDeletes));
+        }
+
+        if (markersMap[id]) {
+            map.removeLayer(markersMap[id]);
+            delete markersMap[id];
+        }
+
+        savedPlaces = savedPlaces.filter(p => String(p.id) !== String(id));
+        updateMarkerCount();
+        renderListView();
+        map.closePopup();
+
+    } catch (err) {
+        alert("Kunde inte radera markören: " + (err.message || err));
+    }
+};
 
 // Initiera och ladda sparade markörer när sidan har laddats
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         savedPlaces = [];
 
-        // 1. Hämta alla poster från Google Sheets om vi är online
+        // 1. Hämta lokalt först för direkt visning (snabbare upplevelse)
+        const stored = getLocalMarkers();
+        if (stored && stored.length > 0) {
+            savedPlaces = stored.map(place => ({
+                ...place,
+                id: String(place.id)
+            }));
+            savedPlaces.forEach(place => addPlaceToMap(place));
+        }
+
+        // 2. Hämta från Google Sheets om online
         if (navigator.onLine) {
             try {
                 const res = await fetch(SCRIPT_URL);
@@ -64,8 +93,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     remoteData.forEach((item, index) => {
                         if (item.latitude === undefined && item.lat === undefined) return;
 
-                        const lat = Number(item.latitude !== undefined ? item.latitude: item.lat);
-                        const lng = Number(item.longitude !== undefined ? item.longitude: item.lng);
+                        const lat = Number(item.latitude !== undefined ? item.latitude : item.lat);
+                        const lng = Number(item.longitude !== undefined ? item.longitude : item.lng);
 
                         if (isNaN(lat) || isNaN(lng)) return;
 
@@ -93,24 +122,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // 2. Om vi är offline eller om Sheets inte gav svar, hämta lokalt
-        if (savedPlaces.length === 0) {
-            const stored = getLocalMarkers();
-            if (stored && stored.length > 0) {
-                savedPlaces = stored.map(place => ({
-                    ...place,
-                    id: String(place.id)
-                }));
-                savedPlaces.forEach(place => addPlaceToMap(place));
-            }
-        }
-
-        // Uppdatera gränssnittet
         updateMarkerCount();
         renderListView();
         renderFilterChips();
 
-        await syncPendingMarkers();
+        try { await syncPendingMarkers(); } catch(e) {}
     } catch (err) {
         console.error("Fel vid laddning av markörer:", err);
     }
@@ -120,21 +136,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 // 1. Kartlager & Kartväljare
 // -----------------------------------------------------------------
 const tileLayers = {
-    topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        {
-            maxZoom: 17,
-            attribution: '© OpenTopoMap'
-        }),
-    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        {
-            maxZoom: 18,
-            attribution: '© Esri'
-        }),
-    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        })
+    topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17,
+        attribution: '© OpenTopoMap'
+    }),
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18,
+        attribution: '© Esri'
+    }),
+    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+    })
 };
 
 let activeLayer = tileLayers.topo;
@@ -158,14 +171,13 @@ if (toggleBtn && menu) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const layerKey = btn.getAttribute('data-tile');
+            if (!tileLayers[layerKey]) return;
 
             map.removeLayer(activeLayer);
             activeLayer = tileLayers[layerKey];
             activeLayer.addTo(map);
 
-            const names = {
-                topo: 'Skogstopo', satellite: 'Satellitvy', osm: 'Standardkarta'
-            };
+            const names = { topo: 'Skogstopo', satellite: 'Satellitvy', osm: 'Standardkarta' };
             if (currentMapName) currentMapName.innerText = names[layerKey];
 
             document.querySelectorAll('.map-option-btn').forEach(b => {
@@ -191,11 +203,11 @@ const myLocationIcon = L.divIcon({
     className: 'my-location-marker',
     html: `
     <div style="position: relative; width: 32px; height: 32px;">
-    <div id="user-heading-arrow" style="position: absolute; top: 0; left: 0; width: 32px; height: 32px; transition: transform 0.2s ease-out; transform-origin: center center;">
-    <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
-    <path d="M12 2L19 21L12 17L5 21L12 2Z" fill="#2563eb" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-    </svg>
-    </div>
+      <div id="user-heading-arrow" style="position: absolute; top: 0; left: 0; width: 32px; height: 32px; transition: transform 0.2s ease-out; transform-origin: center center;">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
+          <path d="M12 2L19 21L12 17L5 21L12 2Z" fill="#2563eb" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+      </div>
     </div>
     `,
     iconSize: [32, 32],
@@ -217,27 +229,31 @@ document.getElementById('input-photo')?.addEventListener('change', async functio
     const file = e.target.files[0];
     if (!file) return;
 
-    currentPhotoBase64 = await compressImage(file);
-    const preview = document.getElementById('photo-preview');
-    const previewContainer = document.getElementById('photo-preview-container');
+    try {
+        currentPhotoBase64 = await compressImage(file);
+        const preview = document.getElementById('photo-preview');
+        const previewContainer = document.getElementById('photo-preview-container');
 
-    if (preview && previewContainer) {
-        preview.src = currentPhotoBase64;
-        previewContainer.classList.remove('hidden');
+        if (preview && previewContainer) {
+            preview.src = currentPhotoBase64;
+            previewContainer.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.error("Fel vid bildkomprimering:", err);
     }
 });
 
 function renderCategoryGrid() {
     const grid = document.getElementById('category-grid');
     if (!grid) return;
-    grid.innerHTML = CATEGORIES.map(cat => {
+    grid.innerHTML = safeCategories.map(cat => {
         const isSelected = selectedCategory && cat.id === selectedCategory.id;
         return `
-        <button data-id="${cat.id}" type="button" class="category-btn p-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition ${isSelected ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-sm': 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}">
-        <div class="flex items-center justify-center h-7 w-7">
-        ${cat.iconSvg}
-        </div>
-        <span class="text-[10px] leading-tight text-center">${cat.name}</span>
+        <button data-id="${cat.id}" type="button" class="category-btn p-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition ${isSelected ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}">
+          <div class="flex items-center justify-center h-7 w-7">
+            ${cat.iconSvg || '📍'}
+          </div>
+          <span class="text-[10px] leading-tight text-center">${cat.name}</span>
         </button>
         `;
     }).join('');
@@ -245,7 +261,7 @@ function renderCategoryGrid() {
     document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const catId = e.currentTarget.getAttribute('data-id');
-            selectedCategory = CATEGORIES.find(c => c.id === catId) || CATEGORIES[0];
+            selectedCategory = safeCategories.find(c => c.id === catId) || safeCategories[0];
             const titleInput = document.getElementById('input-title');
             if (titleInput) titleInput.value = selectedCategory.name;
             renderCategoryGrid();
@@ -254,16 +270,15 @@ function renderCategoryGrid() {
 }
 
 document.querySelectorAll('.amount-btn').forEach(btn => {
-    btn.addEventListener('click',
-        (e) => {
-            selectedAmount = e.currentTarget.getAttribute('data-amount');
-            document.querySelectorAll('.amount-btn').forEach(b => {
-                b.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
-                b.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
-            });
-            e.currentTarget.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
-            e.currentTarget.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+    btn.addEventListener('click', (e) => {
+        selectedAmount = e.currentTarget.getAttribute('data-amount');
+        document.querySelectorAll('.amount-btn').forEach(b => {
+            b.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+            b.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
         });
+        e.currentTarget.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
+        e.currentTarget.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+    });
 });
 
 const modal = document.getElementById('save-modal');
@@ -274,14 +289,17 @@ function closeModal() {
 
 document.getElementById('btn-mark')?.addEventListener('click', () => {
     if (currentCoords) {
-        document.getElementById('modal-coords').innerText = `${currentCoords[0].toFixed(6)}, ${currentCoords[1].toFixed(6)}`;
-        document.getElementById('modal-accuracy').innerText = `±${Math.round(currentAccuracy)}m`;
+        const coordsEl = document.getElementById('modal-coords');
+        const accEl = document.getElementById('modal-accuracy');
+        if (coordsEl) coordsEl.innerText = `${currentCoords[0].toFixed(6)}, ${currentCoords[1].toFixed(6)}`;
+        if (accEl) accEl.innerText = `±${Math.round(currentAccuracy)}m`;
 
-        if (!selectedCategory) selectedCategory = CATEGORIES[0];
-        document.getElementById('input-title').value = selectedCategory.name;
+        if (!selectedCategory) selectedCategory = safeCategories[0];
+        const titleInput = document.getElementById('input-title');
+        if (titleInput) titleInput.value = selectedCategory.name;
 
         renderCategoryGrid();
-        modal.classList.remove('hidden');
+        if (modal) modal.classList.remove('hidden');
     } else {
         alert("Väntar på din GPS-position...");
     }
@@ -317,7 +335,7 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
             title: title,
             categoryGroup: catGroup,
             category: catGroup,
-            description: notes ? `${selectedAmount}. ${notes}`: selectedAmount,
+            description: notes ? `${selectedAmount}. ${notes}` : selectedAmount,
             amount: selectedAmount,
             notes: notes,
             lat: currentCoords[0],
@@ -334,6 +352,7 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
         addPlaceToMap(savedMarker);
         updateMarkerCount();
         renderListView();
+        renderFilterChips();
 
         currentPhotoBase64 = null;
         document.getElementById('photo-preview-container')?.classList.add('hidden');
@@ -346,7 +365,7 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
             markersMap[savedMarker.id].openPopup();
         }
 
-        syncPendingMarkers();
+        try { syncPendingMarkers(); } catch(e){}
 
     } catch (err) {
         console.error("Fel vid sparande av markör:", err);
@@ -357,55 +376,18 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
 // -----------------------------------------------------------------
 // 5. Markör & Kartvisning
 // -----------------------------------------------------------------
-window.removeCurrentMarker = async function(id) {
-    const confirmed = await showConfirm("Vill du ta bort denna markör?", "Ta bort markör");
-    if (!confirmed) return;
-
-    try {
-        await deleteMarker(id);
-
-        if (navigator.onLine) {
-            fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'delete', id: id })
-            }).catch(err => console.warn("Kunde inte radera från Sheets:", err));
-        } else {
-            const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
-            pendingDeletes.push(id);
-            localStorage.setItem('pendingDeletes', JSON.stringify(pendingDeletes));
-        }
-
-        if (markersMap[id]) {
-            map.removeLayer(markersMap[id]);
-            delete markersMap[id];
-        }
-
-        savedPlaces = savedPlaces.filter(p => String(p.id) !== String(id));
-        updateMarkerCount();
-        renderListView();
-        map.closePopup();
-
-    } catch (err) {
-        alert("Kunde inte radera markören: " + err.message);
-    }
-};
-
 function createPopupContent(place) {
-  // Säkra att lat och lng hanteras som nummer även om de kommer som strängar
-  const latNum = Number(place.lat);
-  const lngNum = Number(place.lng);
-  const latFormatted = !isNaN(latNum) ? latNum.toFixed(5) : '0.00000';
-  const lngFormatted = !isNaN(lngNum) ? lngNum.toFixed(5) : '0.00000';
+    const latNum = Number(place.lat);
+    const lngNum = Number(place.lng);
+    const latFormatted = !isNaN(latNum) ? latNum.toFixed(5) : '0.00000';
+    const lngFormatted = !isNaN(lngNum) ? lngNum.toFixed(5) : '0.00000';
 
-  // Säkra fältnamn så att de matchar både 'note', 'notes' och 'description'
-  const noteText = place.description || place.notes || place.note || 'Inga anteckningar angivna.';
-  const categoryText = place.category || place.categoryGroup || 'Svamp';
-  const dateText = place.timestamp ? place.timestamp.slice(0, 10) : (place.date || '');
+    const noteText = place.description || place.notes || place.note || 'Inga anteckningar angivna.';
+    const categoryText = place.category || place.categoryGroup || 'Svamp';
+    const dateText = place.timestamp ? place.timestamp.slice(0, 10) : (place.date || '');
 
-  return `
-    <div class="p-1 pr-6">
+    return `
+    <div class="p-1 pr-6" style="min-width: 200px;">
       <div class="flex items-center justify-between gap-2 mb-2 pr-2">
         <h3 class="font-bold text-slate-900 text-base leading-tight">${place.title || 'Skogsfynd'}</h3>
         <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
@@ -433,15 +415,10 @@ function createPopupContent(place) {
         <a href="https://zoom.earth/#view=${latNum},${lngNum},18z" target="_blank" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
           🌐 Earth
         </a>
-        <a href="geo:${latNum},${lngNum}" class="flex-1 text-center bg-slate-100 text-slate-700 text-xs py-1.5 px-2 rounded-lg font-medium hover:bg-slate-200 transition">
-          🗺️ Maps
-        </a>
       </div>
     </div>
   `;
 }
-
-
 
 function updateMarkerCount() {
     document.querySelectorAll('.marker-count-val').forEach(el => el.innerText = savedPlaces.length);
@@ -458,18 +435,18 @@ function addPlaceToMap(place) {
         className: 'custom-map-pin',
         html: `
         <div style="
-        background: white;
-        border: 2px solid #059669;
-        border-radius: 50%;
-        width: 34px;
-        height: 34px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          background: white;
+          border: 2px solid #059669;
+          border-radius: 50%;
+          width: 34px;
+          height: 34px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         ">
-        ${iconEmoji}
+          ${iconEmoji}
         </div>
         `,
         iconSize: [34, 34],
@@ -477,9 +454,7 @@ function addPlaceToMap(place) {
         popupAnchor: [0, -18]
     });
 
-    const marker = L.marker([Number(place.lat), Number(place.lng)], {
-        icon: customIcon
-    });
+    const marker = L.marker([Number(place.lat), Number(place.lng)], { icon: customIcon });
     marker.bindPopup(createPopupContent(place));
 
     const itemCategory = place.category || place.categoryGroup || 'Övrigt';
@@ -510,11 +485,7 @@ function getCategoryIcon(place) {
 // 6. GPS-spårning
 // -----------------------------------------------------------------
 function updatePosition(position, autoCenter = false) {
-    const {
-        latitude,
-        longitude,
-        accuracy
-    } = position.coords;
+    const { latitude, longitude, accuracy } = position.coords;
     currentCoords = [latitude, longitude];
     currentAccuracy = accuracy;
 
@@ -569,38 +540,6 @@ function updatePosition(position, autoCenter = false) {
     }
 }
 
-window.toggleNavigation = function(id) {
-    if (activeNavMarkerId === id) {
-        activeNavMarkerId = null;
-        if (navLine) {
-            map.removeLayer(navLine);
-            navLine = null;
-        }
-        alert("Navigering avslutad.");
-    } else {
-        activeNavMarkerId = id;
-        const target = savedPlaces.find(p => String(p.id) === String(id));
-        if (target && currentCoords) {
-            const targetCoords = [Number(target.lat), Number(target.lng)];
-            if (navLine) map.removeLayer(navLine);
-
-            navLine = L.polyline([currentCoords, targetCoords], {
-                color: '#2563eb',
-                weight: 4,
-                dashArray: '8, 8'
-            }).addTo(map);
-
-            const dist = calculateDistance(currentCoords[0], currentCoords[1], targetCoords[0], targetCoords[1]);
-            alert(`Navigerar till ${target.title} (${dist} bort)`);
-            map.fitBounds(L.latLngBounds([currentCoords, targetCoords]), {
-                padding: [50, 50]
-            });
-        } else {
-            alert("Kan inte navigera utan GPS-signal.");
-        }
-    }
-};
-
 if ('geolocation' in navigator) {
     let initialCenter = false;
     navigator.geolocation.watchPosition(
@@ -609,16 +548,12 @@ if ('geolocation' in navigator) {
             initialCenter = true;
         },
         (err) => console.warn(err.message),
-        {
-            enableHighAccuracy: true, timeout: 10000, maximumAge: 2000
-        }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
     );
 }
 
 document.getElementById('btn-recenter')?.addEventListener('click', () => {
-    if (currentCoords) map.flyTo(currentCoords, 16, {
-        animate: true, duration: 1.5
-    });
+    if (currentCoords) map.flyTo(currentCoords, 16, { animate: true, duration: 1.5 });
 });
 
 if ('serviceWorker' in navigator) {
@@ -688,11 +623,11 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     const d = R * c;
-    return d < 1 ? `${Math.round(d * 1000)} m`: `${d.toFixed(1)} km`;
+    return d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1)} km`;
 }
 
 function applyCategoryFilter(category) {
@@ -751,8 +686,8 @@ function renderListView() {
 
         const term = searchQuery.toLowerCase().trim();
         const matchesSearch = !term ||
-        (item.title && item.title.toLowerCase().includes(term)) ||
-        (item.description && item.description.toLowerCase().includes(term));
+            (item.title && item.title.toLowerCase().includes(term)) ||
+            (item.description && item.description.toLowerCase().includes(term));
 
         return matchesCategory && matchesSearch;
     });
@@ -760,7 +695,7 @@ function renderListView() {
     if (filteredPlaces.length === 0) {
         container.innerHTML = `
         <div class="p-8 text-center text-slate-400 bg-white rounded-3xl border border-slate-100">
-        <p>${savedPlaces.length === 0 ? 'Inga sparade skogsmarkörer än.': 'Inga markörer matchar din sökning eller filter.'}</p>
+          <p>${savedPlaces.length === 0 ? 'Inga sparade skogsmarkörer än.' : 'Inga markörer matchar din sökning eller filter.'}</p>
         </div>`;
         return;
     }
@@ -780,44 +715,44 @@ function renderListView() {
 
         return `
         <div class="bg-white rounded-3xl p-4 mb-4 border border-slate-100 shadow-sm space-y-3">
-        ${item.photo ? `
-        <div class="w-full h-40 rounded-2xl overflow-hidden mb-2">
-        <img src="${item.photo}" class="w-full h-full object-cover" alt="Skogsbild">
-        </div>
-        `: ''}
+          ${item.photo ? `
+          <div class="w-full h-40 rounded-2xl overflow-hidden mb-2">
+            <img src="${item.photo}" class="w-full h-full object-cover" alt="Skogsbild">
+          </div>
+          ` : ''}
 
-        <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
-        <span class="bg-amber-100/80 text-amber-900 px-3 py-1 rounded-full font-semibold text-xs inline-flex items-center gap-1 border border-amber-200/50">
-        📍 ${item.category || item.categoryGroup || 'Naturfynd'}
-        </span>
-        ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>`: ''}
-        </div>
+          <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
+            <span class="bg-amber-100/80 text-amber-900 px-3 py-1 rounded-full font-semibold text-xs inline-flex items-center gap-1 border border-amber-200/50">
+              📍 ${item.category || item.categoryGroup || 'Naturfynd'}
+            </span>
+            ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>` : ''}
+          </div>
 
-        <div>
-        <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
-        ${item.description ? `
-        <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
-        "${item.description}"
-        </div>
-        `: ''}
-        </div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
+            ${item.description ? `
+            <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
+              "${item.description}"
+            </div>
+            ` : ''}
+          </div>
 
-        <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
-        <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
-        <span>${item.timestamp ? item.timestamp.slice(0, 10): ''}</span>
-        </div>
+          <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
+            <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+            <span>${item.timestamp ? item.timestamp.slice(0, 10) : ''}</span>
+          </div>
 
-        <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
-        <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
-        🌐 Earth
-        </a>
-        <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
-        🗺️ Maps
-        </a>
-        <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
-        🗑️
-        </button>
-        </div>
+          <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
+            <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
+              🌐 Earth
+            </a>
+            <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
+              🗺️ Maps
+            </a>
+            <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
+              🗑️
+            </button>
+          </div>
         </div>
         `;
     }).join('');
@@ -870,10 +805,11 @@ function renderFilterChips() {
 
     let html = `
     <button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${
-    activeCategoryFilter === 'all'
-    ? 'bg-emerald-600 text-white font-semibold shadow-sm': 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+        activeCategoryFilter === 'all'
+        ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
     }">
-    Alla (${savedPlaces.length})
+      Alla (${savedPlaces.length})
     </button>
     `;
 
@@ -883,10 +819,11 @@ function renderFilterChips() {
 
         return `
         <button data-filter="${cat}" class="filter-chip shrink-0 px-3 py-1.5 rounded-full transition ${
-        isSelected
-        ? 'bg-emerald-600 text-white font-semibold shadow-sm': 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+            isSelected
+            ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
         }">
-        ${cat} (${count})
+          ${cat} (${count})
         </button>
         `;
     }).join('');
@@ -921,38 +858,3 @@ if (btnHamburger && hamburgerMenu) {
 document.getElementById('btn-export-gpx')?.addEventListener('click', () => {
     exportToGPX(savedPlaces);
 });
-
-// -----------------------------------------------------------------
-// 9. Bekräftelsemodal
-// -----------------------------------------------------------------
-function showConfirm(message, title = "Ta bort markör") {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('confirm-modal');
-        const msgEl = document.getElementById('confirm-modal-msg');
-        const titleEl = document.getElementById('confirm-modal-title');
-        const btnOk = document.getElementById('confirm-modal-ok');
-        const btnCancel = document.getElementById('confirm-modal-cancel');
-
-        if (!modal) {
-            resolve(confirm(message));
-            return;
-        }
-
-        if (msgEl) msgEl.innerText = message;
-        if (titleEl) titleEl.innerText = title;
-
-        modal.classList.remove('hidden');
-
-        const cleanup = () => {
-            modal.classList.add('hidden');
-            btnOk.removeEventListener('click', onOk);
-            btnCancel.removeEventListener('click', onCancel);
-        };
-
-        const onOk = () => { cleanup(); resolve(true); };
-        const onCancel = () => { cleanup(); resolve(false); };
-
-        btnOk.addEventListener('click', onOk);
-        btnCancel.addEventListener('click', onCancel);
-    });
-}
