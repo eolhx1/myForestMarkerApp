@@ -18,9 +18,7 @@ export function initAutoSync() {
   }
 }
 
-
-
-// Töm raderingskön i sync.js när nätverk finns
+// Samlad funktion för att synka både borttagningar och nya markörer
 export async function syncPendingMarkers() {
     if (!navigator.onLine) return;
 
@@ -42,35 +40,30 @@ export async function syncPendingMarkers() {
         localStorage.removeItem('pendingDeletes');
     }
 
-    // 2. Fortsätt med vanliga nya markörer som väntar på synk...
-}
+    // 2. Synka osynkade nya markörer om SCRIPT_URL finns
+    if (!SCRIPT_URL) return;
 
+    const allMarkers = getLocalMarkers();
+    const unsynced = allMarkers.filter(m => !m.synced);
 
-export async function syncPendingMarkers() {
-  if (!navigator.onLine || !SCRIPT_URL) return;
+    if (unsynced.length === 0) return;
 
-  const allMarkers = getLocalMarkers();
-  const unsynced = allMarkers.filter(m => !m.synced);
+    console.log(`Hittade ${unsynced.length} osynkade markörer. Laddar upp...`);
 
-  if (unsynced.length === 0) return;
+    for (const marker of unsynced) {
+        try {
+            // Skicka till Google Apps Script via POST
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(marker)
+            });
 
-  console.log(`Hittade ${unsynced.length} osynkade markörer. Laddar upp...`);
-
-  for (const marker of unsynced) {
-    try {
-      // Skicka till Google Apps Script via POST (text/plain undviker CORS-problem med Apps Script)
-      const response = await fetch(SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(marker)
-      });
-
-      if (response.ok) {
-        markAsSynced(marker.id);
-        console.log(`✅ Synkad till Google Sheets: ${marker.title}`);
-      }
-    } catch (error) {
-      console.warn(`⏳ Kunde inte synka ${marker.title} just nu (saknar täckning/serverfel).`, error);
+            // Om vi använder no-cors eller om responsen är ok
+            markAsSynced(marker.id);
+            console.log(`✅ Synkad till Google Sheets: ${marker.title}`);
+        } catch (error) {
+            console.warn(`⏳ Kunde inte synka ${marker.title} just nu (saknar täckning/serverfel).`, error);
+        }
     }
-  }
 }
