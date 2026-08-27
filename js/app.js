@@ -1,8 +1,14 @@
+//
+// filename: app.js
+//
+
 import { SCRIPT_URL, CATEGORIES } from './config.js';
 import { saveMarkerLocally, compressImage, getLocalMarkers } from './storage.js';
 import { initAutoSync, syncPendingMarkers } from './sync.js';
 import { exportToGPX } from './exporter.js';
 import { deleteMarker } from './db.js';
+import { exportToGPX, exportToJSON, importFromJSON } from './exporter.js';
+
 
 // Initiera synk-lyssnaren direkt vid appstart
 try { initAutoSync(); } catch (e) { console.warn(e); }
@@ -926,6 +932,48 @@ if (btnHamburger && hamburgerMenu) {
 document.getElementById('btn-export-gpx')?.addEventListener('click', () => {
     exportToGPX(savedPlaces);
 });
+
+// Exportera JSON
+document.getElementById('btn-export-json')?.addEventListener('click', () => {
+    exportToJSON(savedPlaces);
+});
+
+// Importera JSON
+document.getElementById('input-import-json')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    importFromJSON(file, (importedPlaces) => {
+        let addedCount = 0;
+
+        importedPlaces.forEach(item => {
+            // Kontrollera att platsen inte redan finns (baserat på ID eller koordinater)
+            const exists = savedPlaces.some(p => String(p.id) === String(item.id));
+            
+            if (!exists && item.lat && item.lng) {
+                const formatted = {
+                    ...item,
+                    id: String(item.id || `marker_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`)
+                };
+
+                // Spara lokalt och lägg på kartan
+                saveMarkerLocally(formatted);
+                savedPlaces.push(formatted);
+                addPlaceToMap(formatted);
+                addedCount++;
+            }
+        });
+
+        updateMarkerCount();
+        renderListView();
+        renderFilterChips();
+
+        alert(`Återställning klar! Importerade ${addedCount} nya platser.`);
+        e.target.value = ''; // Nollställ filväljaren
+    });
+});
+
+
 
 // -----------------------------------------------------------------
 // 9. Bekräftelsemodal (Promise-baserad)
