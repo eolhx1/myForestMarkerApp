@@ -113,7 +113,7 @@ btnSortNewest?.addEventListener('click', () => {
 });
 
 btnSortDistance?.addEventListener('click', () => {
-    if (!currentPosition) {
+    if (!currentCoords) {
         alert("Väntar på GPS-position för att kunna beräkna avstånd...");
         return;
     }
@@ -124,6 +124,7 @@ btnSortDistance?.addEventListener('click', () => {
     btnSortNewest.classList.add('text-slate-600');
     renderListView();
 });
+
 
 });
 
