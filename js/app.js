@@ -652,12 +652,55 @@ function applyCategoryFilter(category) {
             if (map.hasLayer(marker)) map.removeLayer(marker);
         }
     });
+    
+    applySearchFilter();
 
     renderFilterChips();
     renderListView();
     updateMapFilterBadge();
     updateMarkerCount();
 }
+
+function applySearchFilter() {
+    const searchInput = document.getElementById('search-input');
+    const searchClearBtn = document.getElementById('search-clear');
+    searchQuery = (searchInput?.value || '').toLowerCase().trim();
+
+    // Visa eller dölj kryss-knappen baserat på om det finns text
+    if (searchQuery.length > 0) {
+        searchClearBtn?.classList.remove('hidden');
+    } else {
+        searchClearBtn?.classList.add('hidden');
+    }
+
+    // Uppdatera synligheten för varje markör på kartan
+    Object.keys(markersMap).forEach(id => {
+        const marker = markersMap[id];
+        const place = savedPlaces.find(p => String(p.id) === String(id));
+        if (!place) return;
+
+        // 1. Kategori-check
+        const itemCategory = place.category || place.categoryGroup || 'Övrigt';
+        const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+
+        // 2. Sökords-check (matchar titel eller anteckning/beskrivning)
+        const titleMatch = (place.title || '').toLowerCase().includes(searchQuery);
+        const notesMatch = (place.notes || place.description || '').toLowerCase().includes(searchQuery);
+        const matchesSearch = titleMatch || notesMatch;
+
+        // Markören ska bara synas på kartan om DEN MATCHAR BÅDE kategori och sökning!
+        if (matchesCategory && matchesSearch) {
+            if (!map.hasLayer(marker)) marker.addTo(map);
+        } else {
+            if (map.hasLayer(marker)) map.removeLayer(marker);
+        }
+    });
+
+    renderListView();
+    updateMarkerCount();
+}
+
+
 
 function updateMapFilterBadge() {
     const badge = document.getElementById('active-filter-badge');
@@ -676,10 +719,18 @@ document.getElementById('active-filter-badge')?.addEventListener('click', () => 
     applyCategoryFilter('all');
 });
 
-document.getElementById('search-input')?.addEventListener('input', (e) => {
-    searchQuery = e.target.value;
-    renderListView();
+// Reagera direkt när man skriver i sökfältet
+document.getElementById('search-input')?.addEventListener('input', () => {
+    applySearchFilter();
 });
+
+// Rensa sökfältet vid klick på krysset
+document.getElementById('search-clear')?.addEventListener('click', () => {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
+    applySearchFilter();
+});
+
 
 function renderListView() {
     const container = document.getElementById('list-container');
