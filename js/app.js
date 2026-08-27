@@ -5,7 +5,6 @@
 import { SCRIPT_URL, CATEGORIES } from './config.js';
 import { saveMarkerLocally, compressImage, getLocalMarkers } from './storage.js';
 import { initAutoSync, syncPendingMarkers } from './sync.js';
-import { exportToGPX } from './exporter.js';
 import { deleteMarker } from './db.js';
 import { exportToGPX, exportToJSON, importFromJSON } from './exporter.js';
 
