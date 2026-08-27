@@ -148,6 +148,15 @@ btnSortDistance?.addEventListener('click', () => {
 // -----------------------------------------------------------------
 // 1. Kartlager & Kartväljare
 // -----------------------------------------------------------------
+// Skapa offline-anpassat kartlager för Skogstopo
+const baseTileUrl = 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';
+
+const tileLayers = {
+    topo: L.tileLayer.offline(baseTileUrl, {
+        maxZoom: 17,
+        attribution: '© OpenTopoMap',
+        subdomains: 'abc'
+    }),
 const tileLayers = {
     topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
@@ -163,6 +172,22 @@ const tileLayers = {
     })
 };
 
+// Skapa kontrollen för att ladda ner ett område
+const offlineControl = L.control.savetiles(tileLayers.topo, {
+    zoomlevels: [12, 13, 14, 15, 16], // Nivåer som sparas
+    confirm: function (layer, successCallback) {
+        if (confirm(`Vill du spara kartområdet offline för valt område?`)) {
+            successCallback();
+        }
+    },
+    confirmTarget: function (layer, successCallback) {
+        successCallback();
+    }
+});
+
+offlineControl.addTo(map);
+
+//
 let activeLayer = tileLayers.topo;
 activeLayer.addTo(map);
 
@@ -204,6 +229,9 @@ if (toggleBtn && menu) {
         });
     });
 }
+
+
+
 
 // -----------------------------------------------------------------
 // 2. Ikoner & Stilmallar
@@ -1045,3 +1073,9 @@ window.removeCurrentMarker = async function(id) {
         alert("Kunde inte radera markören: " + (err.message || err));
     }
 };
+
+// Spara kartområde offline
+document.getElementById('btn-download-tiles')?.addEventListener('click', () => {
+    // Startar nedladdning av rutorna som täcks av den aktuella vy du har på skärmen
+    offlineControl._saveTiles();
+});
