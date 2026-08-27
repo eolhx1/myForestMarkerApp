@@ -20,7 +20,7 @@ let currentAccuracy = 0;
 let currentPhotoBase64 = null;
 let activeCategoryFilter = 'all';
 let searchQuery = '';
-let currentSortMode = 'newest'; 
+//let currentSortMode = 'newest'; 
 
 
 
