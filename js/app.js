@@ -492,8 +492,7 @@ function updatePosition(position, autoCenter = false) {
     const { latitude, longitude, accuracy } = position.coords;
     currentCoords = [latitude, longitude];
     currentAccuracy = accuracy;
-    currentPosition = { lat: latitude, lng: longitude };
-
+    
     const accText = `±${Math.round(accuracy)}m`;
     const badge = document.getElementById('gps-accuracy-badge');
     const footer = document.getElementById('gps-accuracy-footer');
