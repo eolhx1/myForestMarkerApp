@@ -26,6 +26,13 @@ let currentSortMode = 'newest';
 
 // Initiera kartan centrerad på Sverige
 const map = L.map('map', { zoomControl: false }).setView([62.0, 15.0], 5);
+// Skapa klustergruppen för markörer och lägg till den på kartan
+const markerClusterGroup = L.markerClusterGroup({
+    disableClusteringAtZoom: 16, // Slutar klustra när du zoomar in tillräckligt nära
+    maxClusterRadius: 40         // Radie i pixlar för hur tätt markörer samlas
+});
+map.addLayer(markerClusterGroup);
+
 
 setTimeout(() => {
     map.invalidateSize();
@@ -478,9 +485,10 @@ function addPlaceToMap(place) {
     const itemCategory = place.category || place.categoryGroup || 'Övrigt';
     const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
 
-    if (isVisible) {
-        marker.addTo(map);
-    }
+if (isVisible) {
+    markerClusterGroup.addLayer(marker);
+}
+
 
     markersMap[place.id] = marker;
 }
@@ -689,11 +697,16 @@ function applySearchFilter() {
         const matchesSearch = titleMatch || notesMatch;
 
         // Markören ska bara synas på kartan om DEN MATCHAR BÅDE kategori och sökning!
-        if (matchesCategory && matchesSearch) {
-            if (!map.hasLayer(marker)) marker.addTo(map);
-        } else {
-            if (map.hasLayer(marker)) map.removeLayer(marker);
-        }
+if (matchesCategory && matchesSearch) {
+    if (!markerClusterGroup.hasLayer(marker)) {
+        markerClusterGroup.addLayer(marker);
+    }
+} else {
+    if (markerClusterGroup.hasLayer(marker)) {
+        markerClusterGroup.removeLayer(marker);
+    }
+}
+
     });
 
     renderListView();
@@ -966,7 +979,7 @@ window.removeCurrentMarker = async function(id) {
         }
 
         if (markersMap[id]) {
-            map.removeLayer(markersMap[id]);
+            markerClusterGroup.removeLayer(markersMap[id]);
             delete markersMap[id];
         }
 
