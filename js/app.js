@@ -51,7 +51,7 @@ setTimeout(() => {
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // Initiera och ladda sparade markörer när sidan har laddats
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     try {
         savedPlaces = [];
 
@@ -67,43 +67,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 2. Hämta från Google Sheets om online
         if (navigator.onLine) {
-            try {
-                const res = await fetch(SCRIPT_URL);
-                const remoteData = await res.json();
+            fetch(SCRIPT_URL)
+                .then(res => res.json())
+                .then(remoteData => {
+                    if (Array.isArray(remoteData) && remoteData.length > 0) {
+                        const loadedPlaces = [];
 
-                if (Array.isArray(remoteData) && remoteData.length > 0) {
-                    const loadedPlaces = [];
+                        remoteData.forEach((item, index) => {
+                            if (item.latitude === undefined && item.lat === undefined) return;
 
-                    remoteData.forEach((item, index) => {
-                        if (item.latitude === undefined && item.lat === undefined) return;
+                            const lat = Number(item.latitude !== undefined ? item.latitude : item.lat);
+                            const lng = Number(item.longitude !== undefined ? item.longitude : item.lng);
 
-                        const lat = Number(item.latitude !== undefined ? item.latitude : item.lat);
-                        const lng = Number(item.longitude !== undefined ? item.longitude : item.lng);
+                            if (isNaN(lat) || isNaN(lng)) return;
 
-                        if (isNaN(lat) || isNaN(lng)) return;
+                            const formatted = {
+                                id: String(item.id || item.Id || `marker_${Date.now()}_${index}`),
+                                lat: lat,
+                                lng: lng,
+                                title: item.title || item.Title || 'Skogsfynd',
+                                categoryGroup: item.category || item.Category || 'Övrigt',
+                                category: item.category || item.Category || 'Övrigt',
+                                description: item.description || item.Description || '',
+                                photo: item.photo || item.Photo || item.photoUrl || null,
+                                timestamp: item.timestamp || item.Timestamp || '',
+                                synced: true
+                            };
 
-                        const formatted = {
-                            id: String(item.id || item.Id || `marker_${Date.now()}_${index}`),
-                            lat: lat,
-                            lng: lng,
-                            title: item.title || item.Title || 'Skogsfynd',
-                            categoryGroup: item.category || item.Category || 'Övrigt',
-                            category: item.category || item.Category || 'Övrigt',
-                            description: item.description || item.Description || '',
-                            photo: item.photo || item.Photo || item.photoUrl || null,
-                            timestamp: item.timestamp || item.Timestamp || '',
-                            synced: true
-                        };
+                            loadedPlaces.push(formatted);
+                            addPlaceToMap(formatted);
+                        });
 
-                        loadedPlaces.push(formatted);
-                        addPlaceToMap(formatted);
-                    });
-
-                    savedPlaces = loadedPlaces;
-                }
-            } catch (sheetErr) {
-                console.warn("Kunde inte hämta från Google Sheets:", sheetErr);
-            }
+                        savedPlaces = loadedPlaces;
+                        updateMarkerCount();
+                        renderListView();
+                        renderFilterChips();
+                        updateMapFilterBadge();
+                    }
+                })
+                .catch(sheetErr => console.warn("Kunde inte hämta från Google Sheets:", sheetErr));
         }
 
         updateMarkerCount();
@@ -111,7 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderFilterChips();
         updateMapFilterBadge();
 
-        try { await syncPendingMarkers(); } catch(e) {}
+        try { syncPendingMarkers(); } catch(e) {}
     } catch (err) {
         console.error("Fel vid laddning av markörer:", err);
     }
@@ -143,6 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
 }); // Stänger DOMContentLoaded
+
 
 
 // -----------------------------------------------------------------
