@@ -117,38 +117,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Sorteringsknappar
-const btnSortNewest = document.getElementById('sort-newest');
-const btnSortDistance = document.getElementById('sort-distance');
+    const btnSortNewest = document.getElementById('sort-newest');
+    const btnSortDistance = document.getElementById('sort-distance');
 
-btnSortNewest?.addEventListener('click', () => {
-    currentSortMode = 'newest';
-    btnSortNewest.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
-    btnSortNewest.classList.remove('text-slate-600');
-    btnSortDistance.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
-    btnSortDistance.classList.add('text-slate-600');
-    renderListView();
-});
+    btnSortNewest?.addEventListener('click', () => {
+        currentSortMode = 'newest';
+        btnSortNewest.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+        btnSortNewest.classList.remove('text-slate-600');
+        btnSortDistance.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+        btnSortDistance.classList.add('text-slate-600');
+        renderListView();
+    });
 
-btnSortDistance?.addEventListener('click', () => {
-    if (!currentCoords) {
-        alert("Väntar på GPS-position för att kunna beräkna avstånd...");
-        return;
-    }
-    currentSortMode = 'distance';
-    btnSortDistance.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
-    btnSortDistance.classList.remove('text-slate-600');
-    btnSortNewest.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
-    btnSortNewest.classList.add('text-slate-600');
-    renderListView();
-});
+    btnSortDistance?.addEventListener('click', () => {
+        if (!currentCoords) {
+            alert("Väntar på GPS-position för att kunna beräkna avstånd...");
+            return;
+        }
+        currentSortMode = 'distance';
+        btnSortDistance.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+        btnSortDistance.classList.remove('text-slate-600');
+        btnSortNewest.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+        btnSortNewest.classList.add('text-slate-600');
+        renderListView();
+    });
 
+}); // Stänger DOMContentLoaded
 
-});
 
 // -----------------------------------------------------------------
 // 1. Kartlager & Kartväljare
 // -----------------------------------------------------------------
-// Skapa offline-anpassat kartlager för Skogstopo
 const baseTileUrl = 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';
 
 const tileLayers = {
@@ -156,11 +155,6 @@ const tileLayers = {
         maxZoom: 17,
         attribution: '© OpenTopoMap',
         subdomains: 'abc'
-    }),
-const tileLayers = {
-    topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-        maxZoom: 17,
-        attribution: '© OpenTopoMap'
     }),
     satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 18,
@@ -174,7 +168,7 @@ const tileLayers = {
 
 // Skapa kontrollen för att ladda ner ett område
 const offlineControl = L.control.savetiles(tileLayers.topo, {
-    zoomlevels: [12, 13, 14, 15, 16], // Nivåer som sparas
+    zoomlevels: [12, 13, 14, 15, 16],
     confirm: function (layer, successCallback) {
         if (confirm(`Vill du spara kartområdet offline för valt område?`)) {
             successCallback();
@@ -187,7 +181,6 @@ const offlineControl = L.control.savetiles(tileLayers.topo, {
 
 offlineControl.addTo(map);
 
-//
 let activeLayer = tileLayers.topo;
 activeLayer.addTo(map);
 
@@ -230,38 +223,6 @@ if (toggleBtn && menu) {
     });
 }
 
-
-
-
-// -----------------------------------------------------------------
-// 2. Ikoner & Stilmallar
-// -----------------------------------------------------------------
-let activeNavMarkerId = null;
-let navLine = null;
-let currentHeading = 0;
-
-const myLocationIcon = L.divIcon({
-    className: 'my-location-marker',
-    html: `
-    <div style="position: relative; width: 32px; height: 32px;">
-      <div id="user-heading-arrow" style="position: absolute; top: 0; left: 0; width: 32px; height: 32px; transition: transform 0.2s ease-out; transform-origin: center center;">
-        <svg viewBox="0 0 24 24" width="32" height="32" fill="none">
-          <path d="M12 2L19 21L12 17L5 21L12 2Z" fill="#2563eb" stroke="white" stroke-width="2" stroke-linejoin="round"/>
-        </svg>
-      </div>
-    </div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-});
-
-const styleSheet = document.createElement("style");
-styleSheet.innerText = `
-@keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
-.leaflet-popup-content-wrapper { padding: 0; border-radius: 1rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-.leaflet-popup-content { margin: 0; width: auto !important; }
-`;
-document.head.appendChild(styleSheet);
 
 // -----------------------------------------------------------------
 // 3. Bildkomprimering & Kategoriinmatning
