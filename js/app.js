@@ -24,8 +24,13 @@ let currentSortMode = 'newest';
 
 
 
-// Initiera kartan centrerad på Sverige
-const map = L.map('map', { zoomControl: false }).setView([62.0, 15.0], 5);
+// Initiera kartan centrerad på Sverige (med maxZoom angiven)
+const map = L.map('map', { 
+    zoomControl: false, 
+    maxZoom: 18 
+}).setView([62.0, 15.0], 5);
+
+
 // Skapa klustergruppen för markörer och lägg till den på kartan
 const markerClusterGroup = L.markerClusterGroup({
     disableClusteringAtZoom: 16, // Slutar klustra när du zoomar in tillräckligt nära
