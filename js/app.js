@@ -20,6 +20,9 @@ let currentAccuracy = 0;
 let currentPhotoBase64 = null;
 let activeCategoryFilter = 'all';
 let searchQuery = '';
+let currentSortMode = 'newest'; 
+
+
 
 // Initiera kartan centrerad på Sverige
 const map = L.map('map', { zoomControl: false }).setView([62.0, 15.0], 5);
@@ -95,6 +98,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
         console.error("Fel vid laddning av markörer:", err);
     }
+    
+    // Sorteringsknappar
+const btnSortNewest = document.getElementById('sort-newest');
+const btnSortDistance = document.getElementById('sort-distance');
+
+btnSortNewest?.addEventListener('click', () => {
+    currentSortMode = 'newest';
+    btnSortNewest.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+    btnSortNewest.classList.remove('text-slate-600');
+    btnSortDistance.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+    btnSortDistance.classList.add('text-slate-600');
+    renderListView();
+});
+
+btnSortDistance?.addEventListener('click', () => {
+    if (!currentPosition) {
+        alert("Väntar på GPS-position för att kunna beräkna avstånd...");
+        return;
+    }
+    currentSortMode = 'distance';
+    btnSortDistance.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+    btnSortDistance.classList.remove('text-slate-600');
+    btnSortNewest.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+    btnSortNewest.classList.add('text-slate-600');
+    renderListView();
+});
+
 });
 
 // -----------------------------------------------------------------
@@ -461,6 +491,7 @@ function updatePosition(position, autoCenter = false) {
     const { latitude, longitude, accuracy } = position.coords;
     currentCoords = [latitude, longitude];
     currentAccuracy = accuracy;
+    currentPosition = { lat: latitude, lng: longitude };
 
     const accText = `±${Math.round(accuracy)}m`;
     const badge = document.getElementById('gps-accuracy-badge');
@@ -654,83 +685,77 @@ function renderListView() {
     const container = document.getElementById('list-container');
     if (!container) return;
 
-    const filteredPlaces = savedPlaces.filter(item => {
+    // 1. Filtrera baserat på kategori & sökning
+    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase();
+    
+    let filtered = savedPlaces.filter(item => {
         const itemCategory = item.category || item.categoryGroup || 'Övrigt';
         const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
-
-        const term = searchQuery.toLowerCase().trim();
-        const matchesSearch = !term ||
-            (item.title && item.title.toLowerCase().includes(term)) ||
-            (item.description && item.description.toLowerCase().includes(term));
+        
+        const titleMatch = (item.title || '').toLowerCase().includes(searchQuery);
+        const notesMatch = (item.notes || '').toLowerCase().includes(searchQuery);
+        const matchesSearch = titleMatch || notesMatch;
 
         return matchesCategory && matchesSearch;
     });
 
-    if (filteredPlaces.length === 0) {
-        container.innerHTML = `
-        <div class="p-8 text-center text-slate-400 bg-white rounded-3xl border border-slate-100">
-          <p>${savedPlaces.length === 0 ? 'Inga sparade skogsmarkörer än.' : 'Inga markörer matchar din sökning eller filter.'}</p>
-        </div>`;
+    // 2. Sortera listan
+    if (currentSortMode === 'distance' && currentCoords) {
+        filtered.sort((a, b) => {
+            const distA = getDistanceMetersOnly(currentCoords[0], currentCoords[1], Number(a.lat), Number(a.lng));
+            const distB = getDistanceMetersOnly(currentCoords[0], currentCoords[1], Number(b.lat), Number(b.lng));
+            return distA - distB;
+        });
+    } else {
+        // Nyast först
+        filtered.sort((a, b) => (b.timestamp || b.id) - (a.timestamp || a.id));
+    }
+
+    // 3. Generera HTML
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">Inga platser hittades</div>`;
         return;
     }
 
-    container.innerHTML = filteredPlaces.map(item => {
-        const lat = Number(item.lat);
-        const lng = Number(item.lng);
-
-        let distText = '';
+    container.innerHTML = filtered.map(item => {
+        let distanceText = '';
         if (currentCoords) {
-            const dist = calculateDistance(currentCoords[0], currentCoords[1], lat, lng);
-            if (dist) distText = `🧭 ${dist} bort`;
+            const distFormatted = calculateDistance(currentCoords[0], currentCoords[1], Number(item.lat), Number(item.lng));
+            if (distFormatted) {
+                distanceText = `<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-mono text-[10px]">📍 ${distFormatted}</span>`;
+            }
         }
 
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-        const earthUrl = `https://earth.google.com/web/@${lat},${lng},0a,500d,35y,0h,0t,0r`;
-
         return `
-        <div class="bg-white rounded-3xl p-4 mb-4 border border-slate-100 shadow-sm space-y-3">
-          ${item.photo ? `
-          <div class="w-full h-40 rounded-2xl overflow-hidden mb-2">
-            <img src="${item.photo}" class="w-full h-full object-cover" alt="Skogsbild">
-          </div>
-          ` : ''}
-
-          <div class="flex items-center gap-2 flex-wrap text-xs font-semibold">
-            <span class="bg-amber-100/80 text-amber-900 px-3 py-1 rounded-full font-semibold text-xs inline-flex items-center gap-1 border border-amber-200/50">
-              📍 ${item.category || item.categoryGroup || 'Naturfynd'}
-            </span>
-            ${distText ? `<span class="bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-100">${distText}</span>` : ''}
-          </div>
-
-          <div>
-            <h3 class="font-bold text-slate-900 text-base leading-snug">${item.title}</h3>
-            ${item.description ? `
-            <div class="mt-1 bg-slate-50 p-3 rounded-2xl text-xs text-slate-600 italic">
-              "${item.description}"
+            <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">${item.icon || '🍄'}</span>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-xs leading-tight">${item.title || 'Namnlös plats'}</h3>
+                            <p class="text-[10px] text-slate-400 mt-0.5">${item.category || 'Övrigt'}</p>
+                        </div>
+                    </div>
+                    ${distanceText}
+                </div>
+                ${item.notes ? `<p class="text-xs text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100">${item.notes}</p>` : ''}
             </div>
-            ` : ''}
-          </div>
-
-          <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono pt-1">
-            <span>📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
-            <span>${item.timestamp ? item.timestamp.slice(0, 10) : ''}</span>
-          </div>
-
-          <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
-            <a href="${earthUrl}" target="_blank" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-center text-xs font-semibold hover:bg-blue-100 transition">
-              🌐 Earth
-            </a>
-            <a href="${mapsUrl}" target="_blank" class="flex-1 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-center text-xs font-semibold hover:bg-emerald-100 transition">
-              🗺️ Maps
-            </a>
-            <button onclick="window.removeCurrentMarker('${item.id}')" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition">
-              🗑️
-            </button>
-          </div>
-        </div>
         `;
     }).join('');
 }
+
+// Hjälpfunktion för exakt sorteringsjämförelse i meter
+function getDistanceMetersOnly(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+
 
 const btnList = document.getElementById('btn-show-list');
 const btnMap = document.getElementById('btn-show-map');
