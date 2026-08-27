@@ -221,10 +221,23 @@ GPS & Kartbok
 <!-- Dropdown-meny -->
 <div id="hamburger-menu" class="hidden absolute right-4 top-16 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 w-56 z-[1000]">
 
-<!-- Lägg till knappen direkt här i HTML -->
+<!-- Lägger till knappen exportera till GPX -->
 <button id="btn-export-gpx" class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
 <span>📥</span> Exportera till GPX
 </button>
+
+<!-- I #hamburger-menu, lägg till dessa alternativ -->
+<button id="btn-export-json" class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+    <span>💾</span> Exportera säkerhetskopia (JSON)
+</button>
+
+<label for="input-import-json" class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition cursor-pointer">
+    <span>📂</span> Återställ från fil (JSON)
+    <input type="file" id="input-import-json" accept=".json" class="hidden">
+</label>
+
+
+
 
 <a href="https://earth.google.com/web/" target="_blank" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
 <span>🌐</span> Google Earth 3D
