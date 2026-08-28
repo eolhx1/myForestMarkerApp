@@ -29,6 +29,10 @@ let currentSortMode = 'newest';
 let activeNavMarkerId = null;
 let navLine = null;
 let currentHeading = 0;
+// Avbryter Gå till
+let targetMarkerId = null;
+let navigationLine = null;
+
 
 
 
@@ -383,6 +387,8 @@ function createPopupContent(place) {
         ? `<p class="text-xs text-slate-600 italic mt-2 leading-relaxed">"${noteText}"</p>` 
         : `<p class="text-xs text-slate-400 italic mt-2">Inga anteckningar angivna.</p>`;
 
+    const isNavigating = targetMarkerId === String(place.id);
+
     return `
     <div style="min-width: 230px; width: 230px;" class="p-1">
       <div class="flex items-start justify-between gap-2 mb-1">
@@ -403,9 +409,9 @@ function createPopupContent(place) {
       </div>
 
       <div class="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-slate-100">
-        <button onclick="drawRouteTo(${place.lat}, ${place.lng})" 
-                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs py-2 px-2 rounded-lg flex items-center justify-center gap-1 shadow-sm transition-colors">
-            🧭 Gå hit
+        <button onclick="toggleRouteTo('${place.id}', ${place.lat}, ${place.lng})" 
+                class="w-full ${isNavigating ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-medium text-xs py-2 px-2 rounded-lg flex items-center justify-center gap-1 shadow-sm transition-colors">
+            🧭 ${isNavigating ? 'Avbryt' : 'Gå hit'}
         </button>
         
         <button onclick="openExternalMap(${place.lat}, ${place.lng})" 
@@ -416,6 +422,7 @@ function createPopupContent(place) {
     </div>
   `;
 }
+
 
 
 function updateMarkerCount() {
@@ -1236,21 +1243,30 @@ window.startNavigationTo = function(id) {
 // Variabel för att hålla reda på den ritade ruttlinjen
 let currentRouteLayer = null;
 
-// Ritar linje från din nuvarande position till markerad plats
+function toggleRouteTo(id, destLat, destLng) {
+    if (targetMarkerId === String(id)) {
+        stopRouteTo();
+    } else {
+        targetMarkerId = String(id);
+        drawRouteTo(destLat, destLng);
+    }
+    map.closePopup();
+}
+
 function drawRouteTo(destLat, destLng) {
     if (!currentCoords) {
         alert("Din position är inte tillgänglig ännu. Se till att GPS är aktiverat.");
         return;
     }
 
-    if (currentRouteLayer) {
-        map.removeLayer(currentRouteLayer);
+    if (navigationLine) {
+        map.removeLayer(navigationLine);
     }
 
     const startLat = currentCoords[0];
     const startLng = currentCoords[1];
 
-    currentRouteLayer = L.polyline(
+    navigationLine = L.polyline(
         [[startLat, startLng], [destLat, destLng]], 
         {
             color: '#2563eb',
@@ -1264,13 +1280,21 @@ function drawRouteTo(destLat, destLng) {
     map.fitBounds(bounds, { padding: [50, 50] });
 }
 
+function stopRouteTo() {    
+    targetMarkerId = null;
+    if (navigationLine) {
+        map.removeLayer(navigationLine);
+        navigationLine = null;
+    }
+}
 
-// Öppnar navigeringskartan i ny flik (tidigare Gå hit-funktionen)
+// Öppnar navigeringskartan i ny flik
 function openExternalMap(lat, lng) {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     window.open(url, '_blank');
 }
 
-
+window.toggleRouteTo = toggleRouteTo;
 window.drawRouteTo = drawRouteTo;
+window.stopRouteTo = stopRouteTo;
 window.openExternalMap = openExternalMap;
