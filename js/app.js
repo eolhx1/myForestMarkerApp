@@ -917,16 +917,33 @@ function renderListView() {
 
     updateMarkerCount();
 
+
     // 2. Sortering
     if (currentSortMode === 'distance' && currentCoords) {
         filtered.sort((a, b) => {
-            const distA = getDistanceMetersOnly(currentCoords[0], currentCoords[1], Number(a.lat), Number(a.lng));
-            const distB = getDistanceMetersOnly(currentCoords[0], currentCoords[1], Number(b.lat), Number(b.lng));
-            return distA - distB;
+            const getMeters = (lat, lng) => {
+                const R = 6371000;
+                const dLat = (Number(lat) - currentCoords[0]) * Math.PI / 180;
+                const dLon = (Number(lng) - currentCoords[1]) * Math.PI / 180;
+                const aVal = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                             Math.cos(currentCoords[0] * Math.PI / 180) * Math.cos(Number(lat) * Math.PI / 180) *
+                             Math.sin(dLon/2) * Math.sin(dLon/2);
+                return R * 2 * Math.atan2(Math.sqrt(aVal), Math.sqrt(1-aVal));
+            };
+
+            return getMeters(a.lat, a.lng) - getMeters(b.lat, b.lng);
         });
     } else {
         filtered.sort((a, b) => (b.timestamp || b.id) - (a.timestamp || a.id));
     }
+
+
+
+
+
+
+
+
 
     // 3. Generera HTML
     if (filtered.length === 0) {
