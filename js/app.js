@@ -499,6 +499,28 @@ if (isVisible) {
     markersMap[place.id] = marker;
 }
 
+function focusMarkerOnMap(id) {
+    const place = savedPlaces.find(p => String(p.id) === String(id));
+    if (!place) return;
+
+    // Växla till kartvyn
+    document.getElementById('list-view')?.classList.add('hidden');
+    document.getElementById('map-view')?.classList.remove('hidden');
+    updateTabStyles(document.getElementById('btn-show-map'), document.getElementById('btn-show-list'));
+    
+    map.invalidateSize();
+
+    // Panera till markören och öppna dess popup
+    map.flyTo([Number(place.lat), Number(place.lng)], 17, { animate: true });
+    if (markersMap[id]) {
+        markersMap[id].openPopup();
+    }
+}
+
+window.focusMarkerOnMap = focusMarkerOnMap;
+
+
+
 // -----------------------------------------------------------------
 // 6. GPS-spårning
 // -----------------------------------------------------------------
@@ -893,7 +915,6 @@ function renderListView() {
         return matchesCategory && matchesSearch;
     });
 
-    // Uppdatera flikknappen "Lista (X)" med antalet synliga platser (t.ex. 25)
     updateMarkerCount();
 
     // 2. Sortering
@@ -918,37 +939,31 @@ function renderListView() {
         if (currentCoords) {
             const distFormatted = calculateDistance(currentCoords[0], currentCoords[1], Number(item.lat), Number(item.lng));
             if (distFormatted) {
-                distanceText = `<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-mono text-[10px]">📍 ${distFormatted}</span>`;
+                distanceText = `<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-mono text-[10px] shrink-0">📍 ${distFormatted}</span>`;
             }
         }
 
+        const iconSvg = getCategoryIcon(item);
+        const noteText = item.notes || item.description || '';
+
         return `
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-                <div class="flex items-start justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xl">${item.icon || '🍄'}</span>
-                        <div>
-                            <h3 class="font-bold text-slate-800 text-xs leading-tight">${item.title || 'Namnlös plats'}</h3>
-                            <p class="text-[10px] text-slate-400 mt-0.5">${item.category || 'Övrigt'}</p>
+            <div onclick="focusMarkerOnMap('${item.id}')" class="cursor-pointer bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-400 hover:shadow transition space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <div class="w-8 h-8 rounded-full border border-emerald-600/30 flex items-center justify-center shrink-0 bg-white shadow-sm">
+                            ${iconSvg}
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="font-bold text-slate-800 text-xs leading-tight truncate">${item.title || 'Namnlös plats'}</h3>
+                            <p class="text-[10px] text-slate-400 mt-0.5 truncate">${item.category || item.categoryGroup || 'Övrigt'}</p>
                         </div>
                     </div>
                     ${distanceText}
                 </div>
-                ${item.notes ? `<p class="text-xs text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100">${item.notes}</p>` : ''}
+                ${noteText ? `<p class="text-xs text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100 italic leading-relaxed">"${noteText}"</p>` : ''}
             </div>
         `;
     }).join('');
-}
-
-// Hjälpfunktion för exakt sorteringsjämförelse i meter
-function getDistanceMetersOnly(lat1, lon1, lat2, lon2) {
-    const R = 6371000;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
 }
 
 
