@@ -1022,9 +1022,3 @@ window.removeCurrentMarker = async function(id) {
         alert("Kunde inte radera markören: " + (err.message || err));
     }
 };
-
-// Spara kartområde offline
-document.getElementById('btn-download-tiles')?.addEventListener('click', () => {
-    // Startar nedladdning av rutorna som täcks av den aktuella vy du har på skärmen
-    offlineControl._saveTiles();
-});
