@@ -379,7 +379,7 @@ function createPopupContent(place) {
     return `
     <div class="p-3" style="min-width: 210px; max-width: 240px;">
       <div class="flex items-start justify-between gap-2 mb-2 pr-4">
-        <h3 class="font-bold text-slate-900 text-sm leading-snug">${place.title || 'Skogsfynd'}</h3>
+        <h3 class="font-bold text-slate-900 text-srm leading-snug">${place.title || 'Skogsfynd'}</h3>
         <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
           🗑️
         </button>
@@ -483,6 +483,30 @@ if (isVisible) {
 // -----------------------------------------------------------------
 // 6. GPS-spårning
 // -----------------------------------------------------------------
+
+const myLocationIcon = L.divIcon({
+    className: 'my-location-marker',
+    html: `
+        <div style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+            <!-- Pulserande bakgrundscirkel -->
+            <div class="animate-ping" style="position: absolute; width: 24px; height: 24px; background: rgba(59, 130, 246, 0.4); border-radius: 50%;"></div>
+            
+            <!-- Blå GPS-punkt -->
+            <div style="position: absolute; width: 14px; height: 14px; background: #2563eb; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.35); z-index: 2;"></div>
+            
+            <!-- Roterande kompasspil -->
+            <div id="user-heading-arrow" style="position: absolute; width: 36px; height: 36px; transition: transform 0.2s ease-out; z-index: 1;">
+                <svg viewBox="0 0 24 24" style="width: 100%; height: 100%; fill: #2563eb; filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.4));">
+                    <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                </svg>
+            </div>
+        </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18]
+});
+
+
 function updatePosition(position, autoCenter = false) {
     const { latitude, longitude, accuracy } = position.coords;
     currentCoords = [latitude, longitude];
