@@ -370,54 +370,46 @@ document.getElementById('btn-save-confirm')?.addEventListener('click', async (e)
 // 5. Markör & Kartvisning
 // -----------------------------------------------------------------
 function createPopupContent(place) {
-    const latNum = Number(place.lat);
-    const lngNum = Number(place.lng);
-    const latFormatted = !isNaN(latNum) ? latNum.toFixed(5) : '0.00000';
-    const lngFormatted = !isNaN(lngNum) ? lngNum.toFixed(5) : '0.00000';
-
-    const noteText = place.description || place.notes || place.note || 'Inga anteckningar angivna.';
-    const categoryText = place.category || place.categoryGroup || 'Övrigt';
-    const dateText = place.timestamp ? place.timestamp.slice(0, 10) : (place.date || '');
+    // Rendera anteckningar eller standardtext om anteckningar saknas
+    const notesContent = place.notes 
+        ? `<p class="text-xs text-gray-600 italic mt-2">${place.notes}</p>` 
+        : `<p class="text-xs text-gray-400 italic mt-2">Inga anteckningar angivna.</p>`;
 
     return `
-    <div class="p-3" style="min-width: 210px; max-width: 240px;">
-      <div class="flex items-start justify-between gap-2 mb-2 pr-4">
-        <h3 class="font-bold text-slate-900 text-srm leading-snug">${place.title || 'Skogsfynd'}</h3>
-        <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
-          🗑️
-        </button>
-      </div>
+        <div class="p-1 min-w-[220px]">
+            <div class="flex justify-between items-start">
+                <h3 class="font-bold text-gray-900 text-sm">${place.name}</h3>
+                <button onclick="deletePlace('${place.id}')" class="text-gray-400 hover:text-red-500 transition-colors p-1" title="Ta bort">
+                    🗑️
+                </button>
+            </div>
+            
+            <span class="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-medium px-2 py-0.5 rounded-full mt-1">
+                ${place.category || 'Svamp'}
+            </span>
 
-      <span class="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-medium px-2.5 py-0.5 rounded-full mb-2">
-        ${categoryText}
-      </span>
+            ${notesContent}
 
-      <p class="text-xs text-slate-600 italic mb-2 leading-relaxed">
-        "${noteText}"
-      </p>
+            <p class="text-[11px] text-gray-400 mt-2 flex items-center gap-1">
+                📍 ${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}
+            </p>
 
-      <div class="text-[11px] text-slate-500 space-y-0.5 mb-3 font-mono">
-        <div>📍 ${latFormatted}, ${lngFormatted}</div>
-        ${dateText ? `<div class="font-sans">⏱️ <b>Tid:</b> ${dateText}</div>` : ''}
-      </div>
-
-// Byt ut dina tidigare knapp-element i popup-HTML:en mot detta:
-    <div class="flex gap-2 mt-3">
-        <!-- Gå hit: Ritar rutten direkt på kartan -->
-        <button onclick="drawRouteTo(${place.lat}, ${place.lng})" class="btn-primary text-xs px-3 py-1.5 rounded-lg flex items-center gap-1">
-            🧭 Gå hit
-        </button>
-        
-        <!-- Karta: Öppnar extern Google Maps -->
-        <button onclick="openExternalMap(${place.lat}, ${place.lng})" class="btn-secondary text-xs px-3 py-1.5 rounded-lg flex items-center gap-1">
-            🗺️ Karta
-        </button>
-    </div>
-
-
-    </div>
-  `;
+            <!-- Knapprad med en knapp till vänster och en till höger -->
+            <div class="grid grid-cols-2 gap-2 mt-4 pt-2 border-t border-gray-100">
+                <button onclick="drawRouteTo(${place.lat}, ${place.lng})" 
+                        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-colors">
+                    🧭 Gå hit
+                </button>
+                
+                <button onclick="openExternalMap(${place.lat}, ${place.lng})" 
+                        class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 border border-gray-200 transition-colors">
+                    🗺️ Karta
+                </button>
+            </div>
+        </div>
+    `;
 }
+
 
 function updateMarkerCount() {
     const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
