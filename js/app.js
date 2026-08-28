@@ -683,6 +683,63 @@ function applyCategoryFilter(category) {
     updateMarkerCount();
 }
 
+function renderSearchSuggestions() {
+    const container = document.getElementById('search-suggestions');
+    const searchInput = document.getElementById('search-input');
+    if (!container || !searchInput) return;
+
+    const query = searchInput.value.toLowerCase().trim();
+
+    // Dölj dropdown om sökfältet är tomt
+    if (query.length === 0) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        return;
+    }
+
+    const matches = new Set();
+    
+    // Sök igenom alla titlar, kategorier och anteckningar
+    savedPlaces.forEach(item => {
+        const title = item.title || '';
+        const category = item.category || item.categoryGroup || '';
+        const notes = item.notes || item.description || '';
+
+        if (title.toLowerCase().includes(query)) matches.add(title);
+        if (category.toLowerCase().includes(query)) matches.add(category);
+        if (notes.toLowerCase().includes(query)) matches.add(notes);
+    });
+
+    const suggestions = Array.from(matches).slice(0, 5); // Visa max 5 förslag
+
+    if (suggestions.length === 0) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        return;
+    }
+
+    // Generera förslagslistan
+    container.innerHTML = suggestions.map(text => `
+        <button type="button" class="suggestion-item w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 transition flex items-center justify-between">
+            <span class="truncate">${text}</span>
+            <span class="text-[10px] text-slate-400 shrink-0 ml-2">🔍</span>
+        </button>
+    `).join('');
+
+    container.classList.remove('hidden');
+
+    // Klickhändelse när användaren väljer ett förslag
+    container.querySelectorAll('.suggestion-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const selectedText = e.currentTarget.querySelector('span').innerText;
+            searchInput.value = selectedText;
+            container.classList.add('hidden');
+            applySearchFilter();
+        });
+    });
+}
+
+
 function applySearchFilter() {
     const searchInput = document.getElementById('search-input');
     const searchClearBtn = document.getElementById('search-clear');
@@ -749,6 +806,7 @@ document.getElementById('active-filter-badge')?.addEventListener('click', () => 
 // Reagera direkt när man skriver i sökfältet
 document.getElementById('search-input')?.addEventListener('input', () => {
     applySearchFilter();
+    renderSearchSuggestions();
 });
 
 // Rensa sökfältet vid klick på krysset
@@ -756,7 +814,18 @@ document.getElementById('search-clear')?.addEventListener('click', () => {
     const searchInput = document.getElementById('search-input');
     if (searchInput) searchInput.value = '';
     applySearchFilter();
+    renderSearchSuggestions();
 });
+
+// Dölj förslagsrutan när man klickar utanför sökfältet
+document.addEventListener('click', (e) => {
+    const suggestions = document.getElementById('search-suggestions');
+    const searchInput = document.getElementById('search-input');
+    if (suggestions && !suggestions.contains(e.target) && e.target !== searchInput) {
+        suggestions.classList.add('hidden');
+    }
+});
+
 
 
 function renderListView() {
