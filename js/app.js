@@ -401,14 +401,20 @@ function createPopupContent(place) {
         ${dateText ? `<div class="font-sans">⏱️ <b>Tid:</b> ${dateText}</div>` : ''}
       </div>
 
-      <div class="flex gap-2 pt-1 border-t border-slate-100">
-        <a href="https://maps.google.com/?q=${latNum},${lngNum}" target="_blank" class="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white !text-white text-xs py-2 px-2 rounded-xl font-semibold transition shadow-sm flex items-center justify-center gap-1 decoration-none">
-          🧭 Gå hit
-        </a>
-        <a href="https://zoom.earth/#view=${latNum},${lngNum},18z" target="_blank" class="flex-1 text-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-2 px-2 rounded-xl font-semibold transition flex items-center justify-center gap-1 decoration-none">
-          🌐 Earth
-        </a>
-      </div>
+// Byt ut dina tidigare knapp-element i popup-HTML:en mot detta:
+    <div class="flex gap-2 mt-3">
+        <!-- Gå hit: Ritar rutten direkt på kartan -->
+        <button onclick="drawRouteTo(${place.lat}, ${place.lng})" class="btn-primary text-xs px-3 py-1.5 rounded-lg flex items-center gap-1">
+            🧭 Gå hit
+        </button>
+        
+        <!-- Karta: Öppnar extern Google Maps -->
+        <button onclick="openExternalMap(${place.lat}, ${place.lng})" class="btn-secondary text-xs px-3 py-1.5 rounded-lg flex items-center gap-1">
+            🗺️ Karta
+        </button>
+    </div>
+
+
     </div>
   `;
 }
@@ -1194,3 +1200,46 @@ window.startNavigationTo = function(id) {
         }
     }
 };
+
+
+// Variabel för att hålla reda på den ritade ruttlinjen
+let currentRouteLayer = null;
+
+// Ritar linje från din nuvarande position till markerad plats
+function drawRouteTo(destLat, destLng) {
+    if (!currentCoords) {
+        alert("Din position är inte tillgänglig ännu. Se till att GPS är aktiverat.");
+        return;
+    }
+
+    if (currentRouteLayer) {
+        map.removeLayer(currentRouteLayer);
+    }
+
+    const startLat = currentCoords[0];
+    const startLng = currentCoords[1];
+
+    currentRouteLayer = L.polyline(
+        [[startLat, startLng], [destLat, destLng]], 
+        {
+            color: '#2563eb',
+            weight: 4,
+            dashArray: '8, 8',
+            opacity: 0.8
+        }
+    ).addTo(map);
+
+    const bounds = L.latLngBounds([[startLat, startLng], [destLat, destLng]]);
+    map.fitBounds(bounds, { padding: [50, 50] });
+}
+
+
+// Öppnar navigeringskartan i ny flik (tidigare Gå hit-funktionen)
+function openExternalMap(lat, lng) {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    window.open(url, '_blank');
+}
+
+
+window.drawRouteTo = drawRouteTo;
+window.openExternalMap = openExternalMap;
