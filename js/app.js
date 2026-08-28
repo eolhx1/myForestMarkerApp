@@ -1185,47 +1185,31 @@ function showConfirm(message, title = "Ta bort markör") {
 
 // Global radera-funktion
 window.removeCurrentMarker = async function(id) {
-    const stringId = String(id);
     const confirmed = await showConfirm("Vill du ta bort denna markör?", "Ta bort markör");
     if (!confirmed) return;
 
     try {
-        // 1. Radera från IndexedDB
-        await deleteMarker(stringId);
+        await deleteMarker(id);
 
-        // 2. Ta bort ur minnes-arrayen DIREKT
-        savedPlaces = savedPlaces.filter(p => String(p.id) !== stringId);
-
-        // 3. Ta bort ur localStorage-cachen om den finns där
-        const localData = getLocalMarkers();
-        if (localData && localData.length > 0) {
-            const updatedLocal = localData.filter(p => String(p.id) !== stringId);
-            localStorage.setItem('saved_markers', JSON.stringify(updatedLocal));
-        }
-
-        // 4. Ta bort från kartan och klustergruppen
-        if (markersMap[stringId]) {
-            markerClusterGroup.removeLayer(markersMap[stringId]);
-            delete markersMap[stringId];
-        }
-
-        // 5. Skicka radering till backend (Google Apps Script)
         if (navigator.onLine) {
             fetch(SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'delete', id: stringId })
+                body: JSON.stringify({ action: 'delete', id: id })
             }).catch(err => console.warn("Kunde inte radera från Sheets:", err));
         } else {
             const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
-            if (!pendingDeletes.includes(stringId)) {
-                pendingDeletes.push(stringId);
-                localStorage.setItem('pendingDeletes', JSON.stringify(pendingDeletes));
-            }
+            pendingDeletes.push(id);
+            localStorage.setItem('pendingDeletes', JSON.stringify(pendingDeletes));
         }
 
-        // 6. Uppdatera gränssnittet
+        if (markersMap[id]) {
+            markerClusterGroup.removeLayer(markersMap[id]);
+            delete markersMap[id];
+        }
+
+        savedPlaces = savedPlaces.filter(p => String(p.id) !== String(id));
         updateMarkerCount();
         renderListView();
         renderFilterChips();
