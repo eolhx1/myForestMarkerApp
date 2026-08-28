@@ -819,9 +819,19 @@ function updateMapFilterBadge() {
 }
 
 
-document.getElementById('active-filter-badge')?.addEventListener('click', () => {
+document.getElementById('active-filter-badge')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+
+    // 1. Rensa sökfältet
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
+
+    // 2. Återställ sökningen och uppdatera vyer och badge
+    applySearchFilter();
     applyCategoryFilter('all');
+    updateMapFilterBadge();
 });
+
 
 // Reagera direkt när man skriver i sökfältet
 document.getElementById('search-input')?.addEventListener('input', () => {
