@@ -413,14 +413,27 @@ function createPopupContent(place) {
   `;
 }
 
-function updateMarkerCount(visibleCount) {
-    // Om inget antal skickas med (t.ex. vid initial laddning), använd totala antalet
-    const countToShow = visibleCount !== undefined ? visibleCount : savedPlaces.length;
+function updateMarkerCount() {
+    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
 
+    // Räkna hur många platser som faktiskt matchar både sökning och aktiv kategori
+    const visiblePlaces = savedPlaces.filter(item => {
+        const itemCategory = item.category || item.categoryGroup || 'Övrigt';
+        const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+
+        const titleMatch = (item.title || '').toLowerCase().includes(searchQuery);
+        const notesMatch = (item.notes || item.description || '').toLowerCase().includes(searchQuery);
+        const matchesSearch = titleMatch || notesMatch;
+
+        return matchesCategory && matchesSearch;
+    });
+
+    // Uppdatera "Lista (X)" med antalet synliga/filtrerade platser
     document.querySelectorAll('.marker-count-val').forEach(el => {
-        el.innerText = countToShow;
+        el.innerText = visiblePlaces.length;
     });
 }
+
 
 
 
@@ -845,7 +858,7 @@ function renderListView() {
     });
 
     // Uppdatera flikknappen "Lista (X)" med antalet synliga platser (t.ex. 25)
-    updateMarkerCount(filtered.length);
+    updateMarkerCount();
 
     // 2. Sortering
     if (currentSortMode === 'distance' && currentCoords) {
