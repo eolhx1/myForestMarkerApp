@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const baseTileUrl = 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';
 
 const tileLayers = {
-    topo: L.tileLayer.offline(baseTileUrl, {
+    topo: L.tileLayer(baseTileUrl, {
         maxZoom: 17,
         attribution: '© OpenTopoMap',
         subdomains: 'abc'
@@ -168,21 +168,6 @@ const tileLayers = {
         attribution: '© OpenStreetMap'
     })
 };
-
-// Skapa kontrollen för att ladda ner ett område
-const offlineControl = L.control.savetiles(tileLayers.topo, {
-    zoomlevels: [12, 13, 14, 15, 16],
-    confirm: function (layer, successCallback) {
-        if (confirm(`Vill du spara kartområdet offline för valt område?`)) {
-            successCallback();
-        }
-    },
-    confirmTarget: function (layer, successCallback) {
-        successCallback();
-    }
-});
-
-offlineControl.addTo(map);
 
 let activeLayer = tileLayers.topo;
 activeLayer.addTo(map);
