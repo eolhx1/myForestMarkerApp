@@ -32,11 +32,6 @@
 <!-- 1. Leaflet CSS & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Korrekt offline-plugin som skapar L.tileLayer.offline -->
-<script src="https://cdn.jsdelivr.net/npm/leaflet.offline@2.2.0/dist/leaflet.offline.min.js"></script>
-
-
-
 
 <!-- 2. MarkerCluster CSS & JS (Måste laddas EFTER Leaflet) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
@@ -225,11 +220,6 @@ GPS & Kartbok
 
 <!-- Dropdown-meny -->
 <div id="hamburger-menu" class="hidden absolute right-4 top-16 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 w-56 z-[1000]">
-    
-    <button id="btn-download-tiles" class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
-    <span>🗺️</span> Spara aktuellt kartområde offline
-</button>
-
 
 <!-- Lägger till knappen exportera till GPX -->
 <button id="btn-export-gpx" class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
