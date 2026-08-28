@@ -26,6 +26,9 @@ let currentPhotoBase64 = null;
 let activeCategoryFilter = 'all';
 let searchQuery = '';
 let currentSortMode = 'newest'; 
+let activeNavMarkerId = null;
+let navLine = null;
+let currentHeading = 0;
 
 
 
@@ -1044,5 +1047,35 @@ window.removeCurrentMarker = async function(id) {
 
     } catch (err) {
         alert("Kunde inte radera markören: " + (err.message || err));
+    }
+};
+
+window.startNavigationTo = function(id) {
+    const target = savedPlaces.find(p => String(p.id) === String(id));
+    if (!target) return;
+
+    // Om vi redan navigerar till denna markör – stäng av navigeringslinjen
+    if (activeNavMarkerId === String(id)) {
+        activeNavMarkerId = null;
+        if (navLine) {
+            map.removeLayer(navLine);
+            navLine = null;
+        }
+        return;
+    }
+
+    activeNavMarkerId = String(id);
+
+    if (currentCoords) {
+        const targetCoords = [Number(target.lat), Number(target.lng)];
+        if (navLine) {
+            navLine.setLatLngs([currentCoords, targetCoords]);
+        } else {
+            navLine = L.polyline([currentCoords, targetCoords], {
+                color: '#2563eb',
+                weight: 4,
+                dashArray: '8, 8'
+            }).addTo(map);
+        }
     }
 };
