@@ -739,13 +739,21 @@ function renderSearchSuggestions() {
 
     container.classList.remove('hidden');
 
-    // Klickhändelse när användaren väljer ett förslag
+// Klickhändelse när användaren väljer ett förslag
     container.querySelectorAll('.suggestion-item').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const selectedText = e.currentTarget.querySelector('span').innerText;
-            searchInput.value = selectedText;
+            // Hämta enbart texten från span med klassen .truncate
+            const selectedText = e.currentTarget.querySelector('.truncate')?.innerText || e.currentTarget.innerText;
+            
+            if (searchInput) {
+                searchInput.value = selectedText.trim();
+            }
+            
             container.classList.add('hidden');
+
+            // Uppdatera filtreringen på kartan och listan samt den gröna badgen
             applySearchFilter();
+            updateMapFilterBadge();
         });
     });
 }
