@@ -413,17 +413,15 @@ function createPopupContent(place) {
   `;
 }
 
-function updateMarkerCount() {
-    // Räkna endast de platser som matchar det aktiva filtret
-    const visiblePlaces = savedPlaces.filter(item => {
-        const itemCategory = item.category || item.categoryGroup || 'Övrigt';
-        return activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
-    });
+function updateMarkerCount(visibleCount) {
+    // Om inget antal skickas med (t.ex. vid initial laddning), använd totala antalet
+    const countToShow = visibleCount !== undefined ? visibleCount : savedPlaces.length;
 
     document.querySelectorAll('.marker-count-val').forEach(el => {
-        el.innerText = visiblePlaces.length;
+        el.innerText = countToShow;
     });
 }
+
 
 
 // Slår upp SVG-ikonen från CATEGORIES (kollar först exakt fyndnamn, sedan kategori)
@@ -832,21 +830,24 @@ function renderListView() {
     const container = document.getElementById('list-container');
     if (!container) return;
 
-    // 1. Filtrera baserat på kategori & sökning
-    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase();
+    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
     
+    // 1. Filtrera listan baserat på aktiv kategori & söktext
     let filtered = savedPlaces.filter(item => {
         const itemCategory = item.category || item.categoryGroup || 'Övrigt';
         const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
         
         const titleMatch = (item.title || '').toLowerCase().includes(searchQuery);
-        const notesMatch = (item.notes || '').toLowerCase().includes(searchQuery);
+        const notesMatch = (item.notes || item.description || '').toLowerCase().includes(searchQuery);
         const matchesSearch = titleMatch || notesMatch;
 
         return matchesCategory && matchesSearch;
     });
 
-    // 2. Sortera listan
+    // Uppdatera flikknappen "Lista (X)" med antalet synliga platser (t.ex. 25)
+    updateMarkerCount(filtered.length);
+
+    // 2. Sortering
     if (currentSortMode === 'distance' && currentCoords) {
         filtered.sort((a, b) => {
             const distA = getDistanceMetersOnly(currentCoords[0], currentCoords[1], Number(a.lat), Number(a.lng));
@@ -854,7 +855,6 @@ function renderListView() {
             return distA - distB;
         });
     } else {
-        // Nyast först
         filtered.sort((a, b) => (b.timestamp || b.id) - (a.timestamp || a.id));
     }
 
@@ -949,6 +949,7 @@ function renderFilterChips() {
         new Set(savedPlaces.map(item => item.category || item.categoryGroup || 'Övrigt'))
     ).filter(Boolean);
 
+    // "Alla" visar alltid totalt antal i registret (t.ex. 76)
     let html = `
     <button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${
         activeCategoryFilter === 'all'
@@ -983,6 +984,7 @@ function renderFilterChips() {
         });
     });
 }
+
 
 // -----------------------------------------------------------------
 // 8. Hamburgermeny & GPX Export
