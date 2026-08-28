@@ -802,13 +802,22 @@ function updateMapFilterBadge() {
     const badgeText = document.getElementById('active-filter-text');
     if (!badge || !badgeText) return;
 
-    if (activeCategoryFilter !== 'all') {
+    const searchQuery = (document.getElementById('search-input')?.value || '').trim();
+
+    if (searchQuery.length > 0) {
+        // Om användaren har sökt i sökrutan
+        badgeText.innerText = `Visar: ${searchQuery}`;
+        badge.classList.remove('hidden');
+    } else if (activeCategoryFilter !== 'all') {
+        // Annars, om en kategori är vald
         badgeText.innerText = `Visar: ${activeCategoryFilter}`;
         badge.classList.remove('hidden');
     } else {
+        // Om varken sökning eller kategori är vald
         badge.classList.add('hidden');
     }
 }
+
 
 document.getElementById('active-filter-badge')?.addEventListener('click', () => {
     applyCategoryFilter('all');
@@ -817,16 +826,20 @@ document.getElementById('active-filter-badge')?.addEventListener('click', () => 
 // Reagera direkt när man skriver i sökfältet
 document.getElementById('search-input')?.addEventListener('input', () => {
     applySearchFilter();
+    updateMapFilterBadge(); // Uppdaterar den gröna knappen "Visar: ..." i realtid
     renderSearchSuggestions();
 });
+
 
 // Rensa sökfältet vid klick på krysset
 document.getElementById('search-clear')?.addEventListener('click', () => {
     const searchInput = document.getElementById('search-input');
     if (searchInput) searchInput.value = '';
     applySearchFilter();
+    updateMapFilterBadge(); // Återställer knappen när sökningen rensas
     renderSearchSuggestions();
 });
+
 
 // Dölj förslagsrutan när man klickar utanför sökfältet
 document.addEventListener('click', (e) => {
