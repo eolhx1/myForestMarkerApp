@@ -11,154 +11,56 @@ import { exportToGPX, exportToJSON, importFromJSON } from './exporter.js';
 // Initiera synk-lyssnaren direkt vid appstart
 try { initAutoSync(); } catch (e) { console.warn(e); }
 
-// Globalt tillstånd
-let safeCategories = Array.isArray(CATEGORIES) && CATEGORIES.length > 0 ? CATEGORIES : [{ id: 'default', name: 'Skogsfynd', group: 'Övrigt', iconSvg: '📍' }];
-let selectedCategory = safeCategories[0];
-let selectedAmount = 'Rikligt med fynd';
-let savedPlaces = [];
-let markersMap = {};
+// -----------------------------------------------------------------
+// Appens Tillstånd (Global State)
+// -----------------------------------------------------------------
+const DEFAULT_CATEGORY = { id: 'default', name: 'Skogsfynd', group: 'Övrigt', iconSvg: '📍' };
+
+const state = {
+    categories: Array.isArray(CATEGORIES) && CATEGORIES.length > 0 ? CATEGORIES : [DEFAULT_CATEGORY],
+    selectedCategory: null,
+    selectedAmount: 'Rikligt med fynd',
+    savedPlaces: [],
+    markersMap: {},
+    currentCoords: null,
+    currentPhotoBase64: null,
+    activeCategoryFilter: 'all',
+    searchQuery: '',
+    currentSortMode: 'newest', 
+    currentHeading: 0,
+    hasReceivedAbsolute: false,
+    targetMarkerId: null
+};
+
+state.selectedCategory = state.categories[0];
+
+// Leaflet-element
 let userPositionMarker = null;
 let userAccuracyCircle = null;
-let currentCoords = null;
-let currentPhotoBase64 = null;
-let activeCategoryFilter = 'all';
-let searchQuery = '';
-let currentSortMode = 'newest'; 
-let currentHeading = 0;
-
-// Navigering ("Gå hit")
-let targetMarkerId = null;
 let navigationLine = null;
 
-// Initiera kartan centrerad på Sverige (med maxZoom angiven)
+// -----------------------------------------------------------------
+// Kartinitiering
+// -----------------------------------------------------------------
 const map = L.map('map', { 
     zoomControl: false, 
     maxZoom: 18 
 }).setView([62.0, 15.0], 5);
 
-// Skapa klustergruppen för markörer och lägg till den på kartan
 const markerClusterGroup = L.markerClusterGroup({
     disableClusteringAtZoom: 16,
     maxClusterRadius: 40
 });
 map.addLayer(markerClusterGroup);
 
-setTimeout(() => {
-    map.invalidateSize();
-}, 100);
-
+setTimeout(() => map.invalidateSize(), 100);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Initiera och ladda sparade markörer när sidan har laddats
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        savedPlaces = [];
-
-        // 1. Hämta lokalt först för direkt visning
-        const stored = getLocalMarkers();
-        if (stored && stored.length > 0) {
-            savedPlaces = stored.map(place => ({
-                ...place,
-                id: String(place.id)
-            }));
-            savedPlaces.forEach(place => addPlaceToMap(place));
-        }
-
-        // 2. Hämta från Google Sheets om online
-        if (navigator.onLine) {
-            fetch(SCRIPT_URL)
-                .then(res => res.json())
-                .then(remoteData => {
-                    if (Array.isArray(remoteData) && remoteData.length > 0) {
-                        const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
-                        const loadedPlaces = [];
-
-                        markerClusterGroup.clearLayers();
-                        markersMap = {};
-
-                        remoteData.forEach((item, index) => {
-                            if (item.latitude === undefined && item.lat === undefined) return;
-
-                            const itemId = String(item.id || item.Id || `marker_${Date.now()}_${index}`);
-                            if (pendingDeletes.includes(itemId)) return;
-
-                            const lat = Number(item.latitude !== undefined ? item.latitude : item.lat);
-                            const lng = Number(item.longitude !== undefined ? item.longitude : item.lng);
-
-                            if (isNaN(lat) || isNaN(lng)) return;
-
-                            const formatted = {
-                                id: itemId,
-                                lat: lat,
-                                lng: lng,
-                                title: item.title || item.Title || 'Skogsfynd',
-                                categoryGroup: item.category || item.Category || 'Övrigt',
-                                category: item.category || item.Category || 'Övrigt',
-                                description: item.description || item.Description || '',
-                                photo: item.photo || item.Photo || item.photoUrl || null,
-                                timestamp: item.timestamp || item.Timestamp || '',
-                                synced: true
-                            };
-
-                            loadedPlaces.push(formatted);
-                            addPlaceToMap(formatted);
-                        });
-
-                        savedPlaces = loadedPlaces;
-                        updateMarkerCount();
-                        renderListView();
-                        renderFilterChips();
-                        updateMapFilterBadge();
-                    }
-                })
-                .catch(sheetErr => console.warn("Kunde inte hämta från Google Sheets:", sheetErr));
-        }
-
-        updateMarkerCount();
-        renderListView();
-        renderFilterChips();
-        updateMapFilterBadge();
-
-        try { syncPendingMarkers(); } catch(e) {}
-    } catch (err) {
-        console.error("Fel vid laddning av markörer:", err);
-    }
-    
-    // Sorteringsknappar
-    const btnSortNewest = document.getElementById('sort-newest');
-    const btnSortDistance = document.getElementById('sort-distance');
-
-    btnSortNewest?.addEventListener('click', () => {
-        currentSortMode = 'newest';
-        btnSortNewest.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
-        btnSortNewest.classList.remove('text-slate-600');
-        btnSortDistance.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
-        btnSortDistance.classList.add('text-slate-600');
-        renderListView();
-    });
-
-    btnSortDistance?.addEventListener('click', () => {
-        if (!currentCoords) {
-            alert("Väntar på GPS-position för att kunna beräkna avstånd...");
-            return;
-        }
-        currentSortMode = 'distance';
-        btnSortDistance.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
-        btnSortDistance.classList.remove('text-slate-600');
-        btnSortNewest.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
-        btnSortNewest.classList.add('text-slate-600');
-        renderListView();
-    });
-
-});
-
 // -----------------------------------------------------------------
-// 1. Kartlager & Kartväljare
+// Kartlager & Kartväljare
 // -----------------------------------------------------------------
-const baseTileUrl = 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png';
-
 const tileLayers = {
-    topo: L.tileLayer(baseTileUrl, {
+    topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
         attribution: '© OpenTopoMap',
         subdomains: 'abc'
@@ -176,19 +78,19 @@ const tileLayers = {
 let activeLayer = tileLayers.topo;
 activeLayer.addTo(map);
 
-const toggleBtn = document.getElementById('map-selector-toggle');
-const menu = document.getElementById('map-selector-menu');
-const currentMapName = document.getElementById('current-map-name');
+function initMapSelector() {
+    const toggleBtn = document.getElementById('map-selector-toggle');
+    const menu = document.getElementById('map-selector-menu');
+    const currentMapName = document.getElementById('current-map-name');
 
-if (toggleBtn && menu) {
+    if (!toggleBtn || !menu) return;
+
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         menu.classList.toggle('hidden');
     });
 
-    document.addEventListener('click', () => {
-        menu.classList.add('hidden');
-    });
+    document.addEventListener('click', () => menu.classList.add('hidden'));
 
     document.querySelectorAll('.map-option-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -216,31 +118,313 @@ if (toggleBtn && menu) {
 }
 
 // -----------------------------------------------------------------
-// 3. Bildkomprimering & Kategoriinmatning
+// Initiering vid DOMContentLoaded
 // -----------------------------------------------------------------
-document.getElementById('input-photo')?.addEventListener('change', async function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+document.addEventListener('DOMContentLoaded', () => {
+    initMapSelector();
+    initEventListeners();
+    loadInitialData();
+});
+
+function loadInitialData() {
+    try {
+        state.savedPlaces = [];
+
+        // 1. Hämta lokalt först för snabb visning
+        const stored = getLocalMarkers();
+        if (stored && stored.length > 0) {
+            state.savedPlaces = stored.map(place => ({ ...place, id: String(place.id) }));
+            state.savedPlaces.forEach(place => addPlaceToMap(place));
+        }
+
+        // 2. Hämta från Google Sheets om online
+        if (navigator.onLine) {
+            fetch(SCRIPT_URL)
+                .then(res => res.json())
+                .then(remoteData => {
+                    if (Array.isArray(remoteData) && remoteData.length > 0) {
+                        const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
+                        const loadedPlaces = [];
+
+                        markerClusterGroup.clearLayers();
+                        state.markersMap = {};
+
+                        remoteData.forEach((item, index) => {
+                            if (item.latitude === undefined && item.lat === undefined) return;
+
+                            const itemId = String(item.id || item.Id || `marker_${Date.now()}_${index}`);
+                            if (pendingDeletes.includes(itemId)) return;
+
+                            const lat = Number(item.latitude !== undefined ? item.latitude : item.lat);
+                            const lng = Number(item.longitude !== undefined ? item.longitude : item.lng);
+
+                            if (isNaN(lat) || isNaN(lng)) return;
+
+                            const formatted = {
+                                id: itemId,
+                                lat,
+                                lng,
+                                title: item.title || item.Title || 'Skogsfynd',
+                                categoryGroup: item.category || item.Category || 'Övrigt',
+                                category: item.category || item.Category || 'Övrigt',
+                                description: item.description || item.Description || '',
+                                photo: item.photo || item.Photo || item.photoUrl || null,
+                                timestamp: item.timestamp || item.Timestamp || '',
+                                synced: true
+                            };
+
+                            loadedPlaces.push(formatted);
+                            addPlaceToMap(formatted);
+                        });
+
+                        state.savedPlaces = loadedPlaces;
+                        refreshUI();
+                    }
+                })
+                .catch(sheetErr => console.warn("Kunde inte hämta från Google Sheets:", sheetErr));
+        }
+
+        refreshUI();
+        try { syncPendingMarkers(); } catch(e) {}
+    } catch (err) {
+        console.error("Fel vid laddning av markörer:", err);
+    }
+}
+
+function refreshUI() {
+    updateMarkerCount();
+    renderListView();
+    renderFilterChips();
+    updateMapFilterBadge();
+}
+
+// -----------------------------------------------------------------
+// Händelselyssnare (Events)
+// -----------------------------------------------------------------
+function initEventListeners() {
+    // Sortering
+    const btnSortNewest = document.getElementById('sort-newest');
+    const btnSortDistance = document.getElementById('sort-distance');
+
+    btnSortNewest?.addEventListener('click', () => {
+        state.currentSortMode = 'newest';
+        btnSortNewest.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+        btnSortNewest.classList.remove('text-slate-600');
+        btnSortDistance?.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+        btnSortDistance?.classList.add('text-slate-600');
+        renderListView();
+    });
+
+    btnSortDistance?.addEventListener('click', () => {
+        if (!state.currentCoords) {
+            alert("Väntar på GPS-position för att kunna beräkna avstånd...");
+            return;
+        }
+        state.currentSortMode = 'distance';
+        btnSortDistance.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+        btnSortDistance.classList.remove('text-slate-600');
+        btnSortNewest?.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+        btnSortNewest?.classList.add('text-slate-600');
+        renderListView();
+    });
+
+    // Flikväxling
+    const btnList = document.getElementById('btn-show-list');
+    const btnMap = document.getElementById('btn-show-map');
+
+    btnList?.addEventListener('click', () => {
+        document.getElementById('map-view')?.classList.add('hidden');
+        document.getElementById('list-view')?.classList.remove('hidden');
+        updateTabStyles(btnList, btnMap);
+        renderFilterChips();
+        renderListView();
+    });
+
+    btnMap?.addEventListener('click', () => {
+        document.getElementById('list-view')?.classList.add('hidden');
+        document.getElementById('map-view')?.classList.remove('hidden');
+        updateTabStyles(btnMap, btnList);
+        setTimeout(() => map.invalidateSize(), 100);
+    });
+
+    // Sökning
+    const searchInput = document.getElementById('search-input');
+    searchInput?.addEventListener('input', () => {
+        applySearchFilter();
+        updateMapFilterBadge();
+        renderSearchSuggestions();
+    });
+
+    document.getElementById('search-clear')?.addEventListener('click', () => {
+        if (searchInput) searchInput.value = '';
+        applySearchFilter();
+        updateMapFilterBadge();
+        renderSearchSuggestions();
+    });
+
+    document.addEventListener('click', (e) => {
+        const suggestions = document.getElementById('search-suggestions');
+        if (suggestions && !suggestions.contains(e.target) && e.target !== searchInput) {
+            suggestions.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('active-filter-badge')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (searchInput) searchInput.value = '';
+        applySearchFilter();
+        applyCategoryFilter('all');
+        updateMapFilterBadge();
+    });
+
+    // Modal & Skapa markör
+    document.getElementById('btn-mark')?.addEventListener('click', () => {
+        if (state.currentCoords) {
+            const coordsEl = document.getElementById('modal-coords');
+            if (coordsEl) coordsEl.innerText = `${state.currentCoords[0].toFixed(6)}, ${state.currentCoords[1].toFixed(6)}`;
+
+            if (!state.selectedCategory) state.selectedCategory = state.categories[0];
+            const titleInput = document.getElementById('input-title');
+            if (titleInput) titleInput.value = state.selectedCategory.name;
+
+            renderCategoryGrid();
+            document.getElementById('save-modal')?.classList.remove('hidden');
+        } else {
+            alert("Väntar på din GPS-position...");
+        }
+    });
+
+    document.getElementById('modal-close')?.addEventListener('click', closeModal);
+    document.getElementById('btn-save-confirm')?.addEventListener('click', handleSaveMarker);
+
+    // Bildhantering
+    document.getElementById('input-photo')?.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            state.currentPhotoBase64 = await compressImage(file);
+            const preview = document.getElementById('photo-preview');
+            const previewContainer = document.getElementById('photo-preview-container');
+
+            if (preview && previewContainer) {
+                preview.src = state.currentPhotoBase64;
+                previewContainer.classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error("Fel vid bildkomprimering:", err);
+        }
+    });
+
+    // Mängdknappar
+    document.querySelectorAll('.amount-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            state.selectedAmount = e.currentTarget.getAttribute('data-amount');
+            document.querySelectorAll('.amount-btn').forEach(b => {
+                b.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+                b.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
+            });
+            e.currentTarget.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
+            e.currentTarget.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+        });
+    });
+
+    // Exportera / Importera / Hamburgare
+    const btnHamburger = document.getElementById('btn-hamburger');
+    const hamburgerMenu = document.getElementById('hamburger-menu');
+
+    if (btnHamburger && hamburgerMenu) {
+        btnHamburger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hamburgerMenu.classList.toggle('hidden');
+        });
+        document.addEventListener('click', () => hamburgerMenu.classList.add('hidden'));
+    }
+
+    document.getElementById('btn-export-gpx')?.addEventListener('click', () => exportToGPX(state.savedPlaces));
+    document.getElementById('btn-export-json')?.addEventListener('click', () => exportToJSON(state.savedPlaces));
+    document.getElementById('input-import-json')?.addEventListener('change', handleImportJSON);
+
+    // GPS Centrera
+    document.getElementById('btn-recenter')?.addEventListener('click', () => {
+        if (state.currentCoords) map.flyTo(state.currentCoords, 16, { animate: true, duration: 1.5 });
+    });
+}
+
+// -----------------------------------------------------------------
+// Modal & Sparfunktioner
+// -----------------------------------------------------------------
+function closeModal() {
+    document.getElementById('save-modal')?.classList.add('hidden');
+}
+
+async function handleSaveMarker(e) {
+    e.preventDefault();
+
+    if (!state.currentCoords) {
+        alert("GPS-position saknas.");
+        return;
+    }
 
     try {
-        currentPhotoBase64 = await compressImage(file);
-        const preview = document.getElementById('photo-preview');
-        const previewContainer = document.getElementById('photo-preview-container');
+        const title = document.getElementById('input-title')?.value || state.selectedCategory?.name || 'Skogsfynd';
+        const notes = document.getElementById('input-notes')?.value || '';
+        const catGroup = state.selectedCategory?.group || state.selectedCategory?.name || 'Övrigt';
 
-        if (preview && previewContainer) {
-            preview.src = currentPhotoBase64;
-            previewContainer.classList.remove('hidden');
+        const photoInput = document.getElementById('input-photo');
+        let photoBase64 = state.currentPhotoBase64;
+
+        if (photoInput?.files?.[0] && !photoBase64) {
+            photoBase64 = await compressImage(photoInput.files[0]);
         }
+
+        const newMarkerData = {
+            id: 'marker_' + Date.now(),
+            title,
+            categoryGroup: catGroup,
+            category: catGroup,
+            description: notes ? `${state.selectedAmount}. ${notes}` : state.selectedAmount,
+            amount: state.selectedAmount,
+            notes,
+            lat: state.currentCoords[0],
+            lng: state.currentCoords[1],
+            photo: photoBase64,
+            timestamp: new Date().toISOString(),
+            synced: false,
+            syncStatus: 'pending'
+        };
+
+        const savedMarker = saveMarkerLocally(newMarkerData);
+
+        state.savedPlaces.push(savedMarker);
+        addPlaceToMap(savedMarker);
+        refreshUI();
+
+        state.currentPhotoBase64 = null;
+        document.getElementById('photo-preview-container')?.classList.add('hidden');
+        const notesInput = document.getElementById('input-notes');
+        if (notesInput) notesInput.value = '';
+
+        closeModal();
+
+        if (state.markersMap[savedMarker.id]) {
+            state.markersMap[savedMarker.id].openPopup();
+        }
+
+        try { syncPendingMarkers(); } catch(e){}
+
     } catch (err) {
-        console.error("Fel vid bildkomprimering:", err);
+        console.error("Fel vid sparande av markör:", err);
+        alert(`Kunde inte spara:\n${err?.message || err}`);
     }
-});
+}
 
 function renderCategoryGrid() {
     const grid = document.getElementById('category-grid');
     if (!grid) return;
-    grid.innerHTML = safeCategories.map(cat => {
-        const isSelected = selectedCategory && cat.id === selectedCategory.id;
+
+    grid.innerHTML = state.categories.map(cat => {
+        const isSelected = state.selectedCategory && cat.id === state.selectedCategory.id;
         return `
         <button data-id="${cat.id}" type="button" class="category-btn p-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition ${isSelected ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}">
           <div class="flex items-center justify-center h-7 w-7">
@@ -254,119 +438,30 @@ function renderCategoryGrid() {
     document.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const catId = e.currentTarget.getAttribute('data-id');
-            selectedCategory = safeCategories.find(c => c.id === catId) || safeCategories[0];
+            state.selectedCategory = state.categories.find(c => c.id === catId) || state.categories[0];
             const titleInput = document.getElementById('input-title');
-            if (titleInput) titleInput.value = selectedCategory.name;
+            if (titleInput) titleInput.value = state.selectedCategory.name;
             renderCategoryGrid();
         });
     });
 }
 
-document.querySelectorAll('.amount-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        selectedAmount = e.currentTarget.getAttribute('data-amount');
-        document.querySelectorAll('.amount-btn').forEach(b => {
-            b.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
-            b.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
-        });
-        e.currentTarget.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
-        e.currentTarget.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
-    });
-});
+// -----------------------------------------------------------------
+// Kartmarkörer & Popups
+// -----------------------------------------------------------------
+function getCategoryIcon(place) {
+    const title = (place.title || '').toLowerCase().trim();
+    const category = (place.category || place.categoryGroup || '').toLowerCase().trim();
 
-const modal = document.getElementById('save-modal');
+    const titleMatch = CATEGORIES.find(c => c.name.toLowerCase() === title || c.id.toLowerCase() === title);
+    if (titleMatch) return titleMatch.iconSvg;
 
-function closeModal() {
-    if (modal) modal.classList.add('hidden');
+    const categoryMatch = CATEGORIES.find(c => c.name.toLowerCase() === category || c.group.toLowerCase() === category);
+    if (categoryMatch) return categoryMatch.iconSvg;
+
+    return `<svg viewBox="0 0 36 36" class="w-6 h-6"><circle cx="18" cy="14" r="7" fill="#EF4444"/><path fill="#DC2626" d="M18 21l-5 11h10l-5-11z"/><circle cx="18" cy="14" r="3" fill="#FFFFFF"/></svg>`;
 }
 
-document.getElementById('btn-mark')?.addEventListener('click', () => {
-    if (currentCoords) {
-        const coordsEl = document.getElementById('modal-coords');
-        if (coordsEl) coordsEl.innerText = `${currentCoords[0].toFixed(6)}, ${currentCoords[1].toFixed(6)}`;
-
-        if (!selectedCategory) selectedCategory = safeCategories[0];
-        const titleInput = document.getElementById('input-title');
-        if (titleInput) titleInput.value = selectedCategory.name;
-
-        renderCategoryGrid();
-        if (modal) modal.classList.remove('hidden');
-    } else {
-        alert("Väntar på din GPS-position...");
-    }
-});
-
-document.getElementById('modal-close')?.addEventListener('click', closeModal);
-
-// -----------------------------------------------------------------
-// 4. Hantering & Spara
-// -----------------------------------------------------------------
-document.getElementById('btn-save-confirm')?.addEventListener('click', async (e) => {
-    e.preventDefault();
-
-    if (!currentCoords) {
-        alert("GPS-position saknas.");
-        return;
-    }
-
-    try {
-        const title = document.getElementById('input-title')?.value || selectedCategory?.name || 'Skogsfynd';
-        const notes = document.getElementById('input-notes')?.value || '';
-        const catGroup = selectedCategory?.group || selectedCategory?.name || 'Övrigt';
-
-        const photoInput = document.getElementById('input-photo');
-        let photoBase64 = currentPhotoBase64;
-
-        if (photoInput && photoInput.files && photoInput.files[0] && !photoBase64) {
-            photoBase64 = await compressImage(photoInput.files[0]);
-        }
-
-        const newMarkerData = {
-            id: 'marker_' + Date.now(),
-            title: title,
-            categoryGroup: catGroup,
-            category: catGroup,
-            description: notes ? `${selectedAmount}. ${notes}` : selectedAmount,
-            amount: selectedAmount,
-            notes: notes,
-            lat: currentCoords[0],
-            lng: currentCoords[1],
-            photo: photoBase64,
-            timestamp: new Date().toISOString(),
-            synced: false,
-            syncStatus: 'pending'
-        };
-
-        const savedMarker = saveMarkerLocally(newMarkerData);
-
-        savedPlaces.push(savedMarker);
-        addPlaceToMap(savedMarker);
-        updateMarkerCount();
-        renderListView();
-        renderFilterChips();
-
-        currentPhotoBase64 = null;
-        document.getElementById('photo-preview-container')?.classList.add('hidden');
-        const notesInput = document.getElementById('input-notes');
-        if (notesInput) notesInput.value = '';
-
-        closeModal();
-
-        if (markersMap[savedMarker.id]) {
-            markersMap[savedMarker.id].openPopup();
-        }
-
-        try { syncPendingMarkers(); } catch(e){}
-
-    } catch (err) {
-        console.error("Fel vid sparande av markör:", err);
-        alert(`Kunde inte spara:\n${err?.message || err}`);
-    }
-});
-
-// -----------------------------------------------------------------
-// 5. Markör & Kartvisning
-// -----------------------------------------------------------------
 function createPopupContent(place) {
     const latNum = Number(place.lat);
     const lngNum = Number(place.lng);
@@ -381,7 +476,7 @@ function createPopupContent(place) {
         ? `<p class="text-xs text-slate-600 italic mt-2 leading-relaxed">"${noteText}"</p>` 
         : `<p class="text-xs text-slate-400 italic mt-2">Inga anteckningar angivna.</p>`;
 
-    const isNavigating = targetMarkerId === String(place.id);
+    const isNavigating = state.targetMarkerId === String(place.id);
 
     return `
     <div style="min-width: 230px; width: 230px;" class="p-1">
@@ -417,41 +512,9 @@ function createPopupContent(place) {
   `;
 }
 
-function updateMarkerCount() {
-    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
-
-    const visiblePlaces = savedPlaces.filter(item => {
-        const itemCategory = item.category || item.categoryGroup || 'Övrigt';
-        const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
-
-        const titleMatch = (item.title || '').toLowerCase().includes(searchQuery);
-        const notesMatch = (item.notes || item.description || '').toLowerCase().includes(searchQuery);
-        const matchesSearch = titleMatch || notesMatch;
-
-        return matchesCategory && matchesSearch;
-    });
-
-    document.querySelectorAll('.marker-count-val').forEach(el => {
-        el.innerText = visiblePlaces.length;
-    });
-}
-
-function getCategoryIcon(place) {
-    const title = (place.title || '').toLowerCase().trim();
-    const category = (place.category || place.categoryGroup || '').toLowerCase().trim();
-
-    const titleMatch = CATEGORIES.find(c => c.name.toLowerCase() === title || c.id.toLowerCase() === title);
-    if (titleMatch) return titleMatch.iconSvg;
-
-    const categoryMatch = CATEGORIES.find(c => c.name.toLowerCase() === category || c.group.toLowerCase() === category);
-    if (categoryMatch) return categoryMatch.iconSvg;
-
-    return `<svg viewBox="0 0 36 36" class="w-6 h-6"><circle cx="18" cy="14" r="7" fill="#EF4444"/><path fill="#DC2626" d="M18 21l-5 11h10l-5-11z"/><circle cx="18" cy="14" r="3" fill="#FFFFFF"/></svg>`;
-}
-
 function addPlaceToMap(place) {
-    if (markersMap[place.id]) {
-        map.removeLayer(markersMap[place.id]);
+    if (state.markersMap[place.id]) {
+        map.removeLayer(state.markersMap[place.id]);
     }
 
     const svgIconHtml = getCategoryIcon(place);
@@ -482,17 +545,17 @@ function addPlaceToMap(place) {
     marker.bindPopup(createPopupContent(place));
 
     const itemCategory = place.category || place.categoryGroup || 'Övrigt';
-    const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+    const isVisible = state.activeCategoryFilter === 'all' || itemCategory === state.activeCategoryFilter;
 
     if (isVisible) {
         markerClusterGroup.addLayer(marker);
     }
 
-    markersMap[place.id] = marker;
+    state.markersMap[place.id] = marker;
 }
 
 function focusMarkerOnMap(id) {
-    const place = savedPlaces.find(p => String(p.id) === String(id));
+    const place = state.savedPlaces.find(p => String(p.id) === String(id));
     if (!place) return;
 
     document.getElementById('list-view')?.classList.add('hidden');
@@ -500,19 +563,17 @@ function focusMarkerOnMap(id) {
     updateTabStyles(document.getElementById('btn-show-map'), document.getElementById('btn-show-list'));
     
     map.invalidateSize();
-
     map.flyTo([Number(place.lat), Number(place.lng)], 17, { animate: true });
-    if (markersMap[id]) {
-        markersMap[id].openPopup();
+
+    if (state.markersMap[id]) {
+        state.markersMap[id].openPopup();
     }
 }
-
 window.focusMarkerOnMap = focusMarkerOnMap;
 
 // -----------------------------------------------------------------
-// 6. GPS-spårning
+// GPS-spårning & Kompass
 // -----------------------------------------------------------------
-
 const myLocationIcon = L.divIcon({
     className: 'my-location-marker',
     html: `
@@ -532,7 +593,7 @@ const myLocationIcon = L.divIcon({
 
 function updatePosition(position, autoCenter = false) {
     const { latitude, longitude, accuracy } = position.coords;
-    currentCoords = [latitude, longitude];
+    state.currentCoords = [latitude, longitude];
     
     const accText = `±${Math.round(accuracy)}m`;
     const badge = document.getElementById('gps-accuracy-badge');
@@ -540,9 +601,7 @@ function updatePosition(position, autoCenter = false) {
     if (badge) badge.innerText = accText;
     if (footer) footer.innerText = `GPS: ${accText}`;
 
-    if (userAccuracyCircle) {
-        map.removeLayer(userAccuracyCircle);
-    }
+    if (userAccuracyCircle) map.removeLayer(userAccuracyCircle);
 
     userAccuracyCircle = L.circle([latitude, longitude], {
         radius: accuracy,
@@ -561,19 +620,15 @@ function updatePosition(position, autoCenter = false) {
         }).addTo(map);
     }
 
-    // Uppdatera navigeringslinjen i realtid när GPS flyttar på sig
-    if (targetMarkerId && navigationLine) {
-        const target = savedPlaces.find(p => String(p.id) === String(targetMarkerId));
+    if (state.targetMarkerId && navigationLine) {
+        const target = state.savedPlaces.find(p => String(p.id) === String(state.targetMarkerId));
         if (target) {
             navigationLine.setLatLngs([[latitude, longitude], [Number(target.lat), Number(target.lng)]]);
         }
     }
 
     if (autoCenter) {
-        map.flyTo([latitude, longitude], 16, {
-            duration: 1.5,
-            easeLinearity: 0.25
-        });
+        map.flyTo([latitude, longitude], 16, { duration: 1.5, easeLinearity: 0.25 });
     }
 }
 
@@ -589,31 +644,16 @@ if ('geolocation' in navigator) {
     );
 }
 
-document.getElementById('btn-recenter')?.addEventListener('click', () => {
-    if (currentCoords) map.flyTo(currentCoords, 16, { animate: true, duration: 1.5 });
-});
-
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
-}
-
-// -----------------------------------------------------------------
-// Kompass & Utjämning
-// -----------------------------------------------------------------
-let hasReceivedAbsolute = false;
-
 function getAbsoluteHeading(event) {
     if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
         return event.webkitCompassHeading;
     }
-
     if (event.alpha !== null && event.alpha !== undefined) {
         let heading = 360 - event.alpha;
         const screenOrientation = window.orientation || (screen.orientation && screen.orientation.angle) || 0;
         heading = (heading + screenOrientation) % 360;
         return heading < 0 ? heading + 360 : heading;
     }
-
     return null;
 }
 
@@ -621,41 +661,29 @@ function handleOrientation(event) {
     const rawHeading = getAbsoluteHeading(event);
     if (rawHeading === null) return;
 
-    if (event.type === 'deviceorientationabsolute') {
-        hasReceivedAbsolute = true;
-    }
+    if (event.type === 'deviceorientationabsolute') state.hasReceivedAbsolute = true;
+    if (event.type === 'deviceorientation' && state.hasReceivedAbsolute) return;
 
-    if (event.type === 'deviceorientation' && hasReceivedAbsolute) {
-        return;
-    }
-
-    if (currentHeading === null) {
-        currentHeading = rawHeading;
+    if (state.currentHeading === null) {
+        state.currentHeading = rawHeading;
     } else {
-        let diff = rawHeading - currentHeading;
+        let diff = rawHeading - state.currentHeading;
         if (diff > 180) diff -= 360;
         if (diff < -180) diff += 360;
-        
-        currentHeading += diff;
+        state.currentHeading += diff;
     }
 
-    updateMarkerRotation(currentHeading);
-}
-
-function updateMarkerRotation(heading) {
     const arrowEl = document.getElementById('user-heading-arrow');
     if (arrowEl) {
         arrowEl.style.transition = 'transform 0.3s ease-out';
-        arrowEl.style.transform = `rotate(${heading}deg)`;
+        arrowEl.style.transform = `rotate(${state.currentHeading}deg)`;
     }
 }
 
 if (window.DeviceOrientationEvent) {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission().then(state => {
-            if (state === 'granted') {
-                window.addEventListener('deviceorientation', handleOrientation, true);
-            }
+            if (state === 'granted') window.addEventListener('deviceorientation', handleOrientation, true);
         }).catch(console.error);
     } else {
         window.addEventListener('deviceorientationabsolute', handleOrientation, true);
@@ -664,7 +692,7 @@ if (window.DeviceOrientationEvent) {
 }
 
 // -----------------------------------------------------------------
-// 7. Listvy & Flikväxling
+// Filtering, Sök & Listvy
 // -----------------------------------------------------------------
 function calculateDistance(lat1, lon1, lat2, lon2) {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -679,17 +707,34 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1)} km`;
 }
 
+function updateMarkerCount() {
+    const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+
+    const visiblePlaces = state.savedPlaces.filter(item => {
+        const itemCategory = item.category || item.categoryGroup || 'Övrigt';
+        const matchesCategory = state.activeCategoryFilter === 'all' || itemCategory === state.activeCategoryFilter;
+
+        const titleMatch = (item.title || '').toLowerCase().includes(searchQuery);
+        const notesMatch = (item.notes || item.description || '').toLowerCase().includes(searchQuery);
+        
+        return matchesCategory && (titleMatch || notesMatch);
+    });
+
+    document.querySelectorAll('.marker-count-val').forEach(el => {
+        el.innerText = visiblePlaces.length;
+    });
+}
+
 function applyCategoryFilter(category) {
-    activeCategoryFilter = category;
+    state.activeCategoryFilter = category;
 
-    Object.keys(markersMap).forEach(id => {
-        const marker = markersMap[id];
-        const place = savedPlaces.find(p => String(p.id) === String(id));
-
+    Object.keys(state.markersMap).forEach(id => {
+        const marker = state.markersMap[id];
+        const place = state.savedPlaces.find(p => String(p.id) === String(id));
         if (!place) return;
 
         const itemCategory = place.category || place.categoryGroup || 'Övrigt';
-        const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+        const isVisible = state.activeCategoryFilter === 'all' || itemCategory === state.activeCategoryFilter;
 
         if (isVisible) {
             if (!map.hasLayer(marker)) marker.addTo(map);
@@ -702,6 +747,40 @@ function applyCategoryFilter(category) {
     renderFilterChips();
     renderListView();
     updateMapFilterBadge();
+    updateMarkerCount();
+}
+
+function applySearchFilter() {
+    const searchInput = document.getElementById('search-input');
+    const searchClearBtn = document.getElementById('search-clear');
+    state.searchQuery = (searchInput?.value || '').toLowerCase().trim();
+
+    if (state.searchQuery.length > 0) {
+        searchClearBtn?.classList.remove('hidden');
+    } else {
+        searchClearBtn?.classList.add('hidden');
+    }
+
+    Object.keys(state.markersMap).forEach(id => {
+        const marker = state.markersMap[id];
+        const place = state.savedPlaces.find(p => String(p.id) === String(id));
+        if (!place) return;
+
+        const itemCategory = place.category || place.categoryGroup || 'Övrigt';
+        const matchesCategory = state.activeCategoryFilter === 'all' || itemCategory === state.activeCategoryFilter;
+
+        const titleMatch = (place.title || '').toLowerCase().includes(state.searchQuery);
+        const notesMatch = (place.notes || place.description || '').toLowerCase().includes(state.searchQuery);
+        const matchesSearch = titleMatch || notesMatch;
+
+        if (matchesCategory && matchesSearch) {
+            if (!markerClusterGroup.hasLayer(marker)) markerClusterGroup.addLayer(marker);
+        } else {
+            if (markerClusterGroup.hasLayer(marker)) markerClusterGroup.removeLayer(marker);
+        }
+    });
+
+    renderListView();
     updateMarkerCount();
 }
 
@@ -719,8 +798,7 @@ function renderSearchSuggestions() {
     }
 
     const matches = new Set();
-    
-    savedPlaces.forEach(item => {
+    state.savedPlaces.forEach(item => {
         const title = item.title || '';
         const category = item.category || item.categoryGroup || '';
         const notes = item.notes || item.description || '';
@@ -750,54 +828,12 @@ function renderSearchSuggestions() {
     container.querySelectorAll('.suggestion-item').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const selectedText = e.currentTarget.querySelector('.truncate')?.innerText || e.currentTarget.innerText;
-            
-            if (searchInput) {
-                searchInput.value = selectedText.trim();
-            }
-            
+            if (searchInput) searchInput.value = selectedText.trim();
             container.classList.add('hidden');
             applySearchFilter();
             updateMapFilterBadge();
         });
     });
-}
-
-function applySearchFilter() {
-    const searchInput = document.getElementById('search-input');
-    const searchClearBtn = document.getElementById('search-clear');
-    searchQuery = (searchInput?.value || '').toLowerCase().trim();
-
-    if (searchQuery.length > 0) {
-        searchClearBtn?.classList.remove('hidden');
-    } else {
-        searchClearBtn?.classList.add('hidden');
-    }
-
-    Object.keys(markersMap).forEach(id => {
-        const marker = markersMap[id];
-        const place = savedPlaces.find(p => String(p.id) === String(id));
-        if (!place) return;
-
-        const itemCategory = place.category || place.categoryGroup || 'Övrigt';
-        const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
-
-        const titleMatch = (place.title || '').toLowerCase().includes(searchQuery);
-        const notesMatch = (place.notes || place.description || '').toLowerCase().includes(searchQuery);
-        const matchesSearch = titleMatch || notesMatch;
-
-        if (matchesCategory && matchesSearch) {
-            if (!markerClusterGroup.hasLayer(marker)) {
-                markerClusterGroup.addLayer(marker);
-            }
-        } else {
-            if (markerClusterGroup.hasLayer(marker)) {
-                markerClusterGroup.removeLayer(marker);
-            }
-        }
-    });
-
-    renderListView();
-    updateMarkerCount();
 }
 
 function updateMapFilterBadge() {
@@ -810,46 +846,13 @@ function updateMapFilterBadge() {
     if (searchQuery.length > 0) {
         badgeText.innerText = `Visar: ${searchQuery}`;
         badge.classList.remove('hidden');
-    } else if (activeCategoryFilter !== 'all') {
-        badgeText.innerText = `Visar: ${activeCategoryFilter}`;
+    } else if (state.activeCategoryFilter !== 'all') {
+        badgeText.innerText = `Visar: ${state.activeCategoryFilter}`;
         badge.classList.remove('hidden');
     } else {
         badge.classList.add('hidden');
     }
 }
-
-document.getElementById('active-filter-badge')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.value = '';
-
-    applySearchFilter();
-    applyCategoryFilter('all');
-    updateMapFilterBadge();
-});
-
-document.getElementById('search-input')?.addEventListener('input', () => {
-    applySearchFilter();
-    updateMapFilterBadge();
-    renderSearchSuggestions();
-});
-
-document.getElementById('search-clear')?.addEventListener('click', () => {
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.value = '';
-    applySearchFilter();
-    updateMapFilterBadge();
-    renderSearchSuggestions();
-});
-
-document.addEventListener('click', (e) => {
-    const suggestions = document.getElementById('search-suggestions');
-    const searchInput = document.getElementById('search-input');
-    if (suggestions && !suggestions.contains(e.target) && e.target !== searchInput) {
-        suggestions.classList.add('hidden');
-    }
-});
 
 function renderListView() {
     const container = document.getElementById('list-container');
@@ -857,31 +860,29 @@ function renderListView() {
 
     const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
     
-    let filtered = savedPlaces.filter(item => {
+    let filtered = state.savedPlaces.filter(item => {
         const itemCategory = item.category || item.categoryGroup || 'Övrigt';
-        const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
+        const matchesCategory = state.activeCategoryFilter === 'all' || itemCategory === state.activeCategoryFilter;
         
         const titleMatch = (item.title || '').toLowerCase().includes(searchQuery);
         const notesMatch = (item.notes || item.description || '').toLowerCase().includes(searchQuery);
-        const matchesSearch = titleMatch || notesMatch;
 
-        return matchesCategory && matchesSearch;
+        return matchesCategory && (titleMatch || notesMatch);
     });
 
     updateMarkerCount();
 
-    if (currentSortMode === 'distance' && currentCoords) {
+    if (state.currentSortMode === 'distance' && state.currentCoords) {
         filtered.sort((a, b) => {
             const getMeters = (lat, lng) => {
                 const R = 6371000;
-                const dLat = (Number(lat) - currentCoords[0]) * Math.PI / 180;
-                const dLon = (Number(lng) - currentCoords[1]) * Math.PI / 180;
+                const dLat = (Number(lat) - state.currentCoords[0]) * Math.PI / 180;
+                const dLon = (Number(lng) - state.currentCoords[1]) * Math.PI / 180;
                 const aVal = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                             Math.cos(currentCoords[0] * Math.PI / 180) * Math.cos(Number(lat) * Math.PI / 180) *
+                             Math.cos(state.currentCoords[0] * Math.PI / 180) * Math.cos(Number(lat) * Math.PI / 180) *
                              Math.sin(dLon/2) * Math.sin(dLon/2);
                 return R * 2 * Math.atan2(Math.sqrt(aVal), Math.sqrt(1-aVal));
             };
-
             return getMeters(a.lat, a.lng) - getMeters(b.lat, b.lng);
         });
     } else {
@@ -895,8 +896,8 @@ function renderListView() {
 
     container.innerHTML = filtered.map(item => {
         let distanceText = '';
-        if (currentCoords) {
-            const distFormatted = calculateDistance(currentCoords[0], currentCoords[1], Number(item.lat), Number(item.lng));
+        if (state.currentCoords) {
+            const distFormatted = calculateDistance(state.currentCoords[0], state.currentCoords[1], Number(item.lat), Number(item.lng));
             if (distFormatted) {
                 distanceText = `<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-mono text-[10px] shrink-0">📍 ${distFormatted}</span>`;
             }
@@ -925,64 +926,27 @@ function renderListView() {
     }).join('');
 }
 
-const btnList = document.getElementById('btn-show-list');
-const btnMap = document.getElementById('btn-show-map');
-
-function updateTabStyles(activeBtn, inactiveBtn) {
-    if (!activeBtn || !inactiveBtn) return;
-    activeBtn.style.backgroundColor = '#ffffff';
-    activeBtn.style.color = '#065f46';
-    activeBtn.style.borderRadius = '0.75rem';
-    activeBtn.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-    activeBtn.style.fontWeight = '600';
-
-    inactiveBtn.style.backgroundColor = 'transparent';
-    inactiveBtn.style.color = '#475569';
-    inactiveBtn.style.borderRadius = '0.75rem';
-    inactiveBtn.style.boxShadow = 'none';
-    inactiveBtn.style.fontWeight = '500';
-}
-
-if (btnList) {
-    btnList.addEventListener('click', () => {
-        document.getElementById('map-view')?.classList.add('hidden');
-        document.getElementById('list-view')?.classList.remove('hidden');
-        updateTabStyles(btnList, btnMap);
-        renderFilterChips();
-        renderListView();
-    });
-}
-
-if (btnMap) {
-    btnMap.addEventListener('click', () => {
-        document.getElementById('list-view')?.classList.add('hidden');
-        document.getElementById('map-view')?.classList.remove('hidden');
-        updateTabStyles(btnMap, btnList);
-        setTimeout(() => map.invalidateSize(), 100);
-    });
-}
-
 function renderFilterChips() {
     const chipsContainer = document.getElementById('filter-chips');
     if (!chipsContainer) return;
 
     const uniqueCategories = Array.from(
-        new Set(savedPlaces.map(item => item.category || item.categoryGroup || 'Övrigt'))
+        new Set(state.savedPlaces.map(item => item.category || item.categoryGroup || 'Övrigt'))
     ).filter(Boolean);
 
     let html = `
     <button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${
-        activeCategoryFilter === 'all'
+        state.activeCategoryFilter === 'all'
         ? 'bg-emerald-600 text-white font-semibold shadow-sm'
         : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
     }">
-      Alla (${savedPlaces.length})
+      Alla (${state.savedPlaces.length})
     </button>
     `;
 
     html += uniqueCategories.map(cat => {
-        const count = savedPlaces.filter(p => (p.category || p.categoryGroup || 'Övrigt') === cat).length;
-        const isSelected = activeCategoryFilter === cat;
+        const count = state.savedPlaces.filter(p => (p.category || p.categoryGroup || 'Övrigt') === cat).length;
+        const isSelected = state.activeCategoryFilter === cat;
 
         return `
         <button data-filter="${cat}" class="filter-chip shrink-0 px-3 py-1.5 rounded-full transition ${
@@ -999,38 +963,30 @@ function renderFilterChips() {
 
     chipsContainer.querySelectorAll('.filter-chip').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const selectedCat = e.currentTarget.getAttribute('data-filter');
-            applyCategoryFilter(selectedCat);
+            applyCategoryFilter(e.currentTarget.getAttribute('data-filter'));
         });
     });
 }
 
-// -----------------------------------------------------------------
-// 8. Hamburgermeny & GPX / JSON Export
-// -----------------------------------------------------------------
-const btnHamburger = document.getElementById('btn-hamburger');
-const hamburgerMenu = document.getElementById('hamburger-menu');
+function updateTabStyles(activeBtn, inactiveBtn) {
+    if (!activeBtn || !inactiveBtn) return;
+    activeBtn.style.backgroundColor = '#ffffff';
+    activeBtn.style.color = '#065f46';
+    activeBtn.style.borderRadius = '0.75rem';
+    activeBtn.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+    activeBtn.style.fontWeight = '600';
 
-if (btnHamburger && hamburgerMenu) {
-    btnHamburger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        hamburgerMenu.classList.toggle('hidden');
-    });
-
-    document.addEventListener('click', () => {
-        hamburgerMenu.classList.add('hidden');
-    });
+    inactiveBtn.style.backgroundColor = 'transparent';
+    inactiveBtn.style.color = '#475569';
+    inactiveBtn.style.borderRadius = '0.75rem';
+    inactiveBtn.style.boxShadow = 'none';
+    inactiveBtn.style.fontWeight = '500';
 }
 
-document.getElementById('btn-export-gpx')?.addEventListener('click', () => {
-    exportToGPX(savedPlaces);
-});
-
-document.getElementById('btn-export-json')?.addEventListener('click', () => {
-    exportToJSON(savedPlaces);
-});
-
-document.getElementById('input-import-json')?.addEventListener('change', (e) => {
+// -----------------------------------------------------------------
+// Importera / Radera / Rutter
+// -----------------------------------------------------------------
+function handleImportJSON(e) {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -1038,7 +994,7 @@ document.getElementById('input-import-json')?.addEventListener('change', (e) => 
         let addedCount = 0;
 
         importedPlaces.forEach(item => {
-            const exists = savedPlaces.some(p => String(p.id) === String(item.id));
+            const exists = state.savedPlaces.some(p => String(p.id) === String(item.id));
             
             if (!exists && item.lat && item.lng) {
                 const formatted = {
@@ -1047,24 +1003,18 @@ document.getElementById('input-import-json')?.addEventListener('change', (e) => 
                 };
 
                 saveMarkerLocally(formatted);
-                savedPlaces.push(formatted);
+                state.savedPlaces.push(formatted);
                 addPlaceToMap(formatted);
                 addedCount++;
             }
         });
 
-        updateMarkerCount();
-        renderListView();
-        renderFilterChips();
-
+        refreshUI();
         alert(`Återställning klar! Importerade ${addedCount} nya platser.`);
         e.target.value = '';
     });
-});
+}
 
-// -----------------------------------------------------------------
-// 9. Bekräftelsemodal (Promise-baserad)
-// -----------------------------------------------------------------
 function showConfirm(message, title = "Ta bort markör") {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirm-modal');
@@ -1109,7 +1059,7 @@ window.removeCurrentMarker = async function(id) {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'delete', id: id })
+                body: JSON.stringify({ action: 'delete', id })
             }).catch(err => console.warn("Kunde inte radera från Sheets:", err));
         } else {
             const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
@@ -1117,16 +1067,13 @@ window.removeCurrentMarker = async function(id) {
             localStorage.setItem('pendingDeletes', JSON.stringify(pendingDeletes));
         }
 
-        if (markersMap[id]) {
-            markerClusterGroup.removeLayer(markersMap[id]);
-            delete markersMap[id];
+        if (state.markersMap[id]) {
+            markerClusterGroup.removeLayer(state.markersMap[id]);
+            delete state.markersMap[id];
         }
 
-        savedPlaces = savedPlaces.filter(p => String(p.id) !== String(id));
-        updateMarkerCount();
-        renderListView();
-        renderFilterChips();
-        updateMapFilterBadge();
+        state.savedPlaces = state.savedPlaces.filter(p => String(p.id) !== String(id));
+        refreshUI();
         map.closePopup();
 
     } catch (err) {
@@ -1134,40 +1081,30 @@ window.removeCurrentMarker = async function(id) {
     }
 };
 
-// -----------------------------------------------------------------
-// 10. Ruttritning & Externa Kartor
-// -----------------------------------------------------------------
 function toggleRouteTo(id, destLat, destLng) {
-    if (targetMarkerId === String(id)) {
+    if (state.targetMarkerId === String(id)) {
         stopRouteTo();
     } else {
-        targetMarkerId = String(id);
+        state.targetMarkerId = String(id);
         drawRouteTo(destLat, destLng);
     }
     map.closePopup();
 }
 
 function drawRouteTo(destLat, destLng) {
-    if (!currentCoords) {
+    if (!state.currentCoords) {
         alert("Din position är inte tillgänglig ännu. Se till att GPS är aktiverat.");
         return;
     }
 
-    if (navigationLine) {
-        map.removeLayer(navigationLine);
-    }
+    if (navigationLine) map.removeLayer(navigationLine);
 
-    const startLat = currentCoords[0];
-    const startLng = currentCoords[1];
+    const startLat = state.currentCoords[0];
+    const startLng = state.currentCoords[1];
 
     navigationLine = L.polyline(
         [[startLat, startLng], [destLat, destLng]], 
-        {
-            color: '#2563eb',
-            weight: 4,
-            dashArray: '8, 8',
-            opacity: 0.8
-        }
+        { color: '#2563eb', weight: 4, dashArray: '8, 8', opacity: 0.8 }
     ).addTo(map);
 
     const bounds = L.latLngBounds([[startLat, startLng], [destLat, destLng]]);
@@ -1175,7 +1112,7 @@ function drawRouteTo(destLat, destLng) {
 }
 
 function stopRouteTo() {    
-    targetMarkerId = null;
+    state.targetMarkerId = null;
     if (navigationLine) {
         map.removeLayer(navigationLine);
         navigationLine = null;
@@ -1183,11 +1120,16 @@ function stopRouteTo() {
 }
 
 function openExternalMap(lat, lng) {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    window.open(url, '_blank');
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
 }
 
+// Globala funktioner för inline Event Handlers i Popups
 window.toggleRouteTo = toggleRouteTo;
 window.drawRouteTo = drawRouteTo;
 window.stopRouteTo = stopRouteTo;
 window.openExternalMap = openExternalMap;
+
+// Registrera Service Worker för PWA-stöd
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+}
