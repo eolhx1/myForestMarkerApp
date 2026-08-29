@@ -298,7 +298,6 @@ function closeModal() {
 document.getElementById('btn-mark')?.addEventListener('click', () => {
     if (currentCoords) {
         const coordsEl = document.getElementById('modal-coords');
-        const accEl = document.getElementById('modal-accuracy');
         if (coordsEl) coordsEl.innerText = `${currentCoords[0].toFixed(6)}, ${currentCoords[1].toFixed(6)}`;
         if (accEl) accEl.innerText = `±${Math.round(currentAccuracy)}m`;
 
