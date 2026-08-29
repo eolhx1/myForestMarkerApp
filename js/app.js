@@ -645,17 +645,33 @@ if ('serviceWorker' in navigator) {
 // -----------------------------------------------------------------
 // Kompass & Utjämning
 // -----------------------------------------------------------------
-const SMOOTHING_FACTOR = 0.15;
-const MIN_CHANGE = 2;
+// Sänkt smoothing-faktor för mjukare, mindre känslig rörelse
+const SMOOTHING_FACTOR = 0.08; 
+const MIN_CHANGE = 3.5; // Ignorerar mikrorörelser under 3.5 grader
 
-function handleOrientation(event) {
-    let rawHeading = null;
-    if (event.webkitCompassHeading) {
-        rawHeading = event.webkitCompassHeading;
-    } else if (event.alpha !== null) {
-        rawHeading = 360 - event.alpha;
+function getAbsoluteHeading(event) {
+    // 1. iOS / WebKit (skickar färdig kompassriktning mot magnetisk nord)
+    if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
+        return event.webkitCompassHeading;
     }
 
+    // 2. Android / Standard deviceorientation
+    if (event.alpha !== null && event.alpha !== undefined) {
+        // Om absolut compass-data finns (deviceorientationabsolute)
+        let heading = 360 - event.alpha;
+
+        // Korrigera för skärmens rotation (porträtt vs landskap)
+        const screenOrientation = window.orientation || (screen.orientation && screen.orientation.angle) || 0;
+        heading = (heading + screenOrientation) % 360;
+
+        return heading < 0 ? heading + 360 : heading;
+    }
+
+    return null;
+}
+
+function handleOrientation(event) {
+    const rawHeading = getAbsoluteHeading(event);
     if (rawHeading === null) return;
 
     if (currentHeading === null || currentHeading === 0) {
@@ -664,12 +680,15 @@ function handleOrientation(event) {
         return;
     }
 
+    // Beräkna kortaste avstånd mellan vinklarna (-180 till 180 deg)
     let diff = rawHeading - currentHeading;
     if (diff > 180) diff -= 360;
     if (diff < -180) diff += 360;
 
+    // Ignorera smådarrningar under tröskelvärdet
     if (Math.abs(diff) < MIN_CHANGE) return;
 
+    // Applicera lågpassfilter för utjämning
     currentHeading = currentHeading + (diff * SMOOTHING_FACTOR);
     currentHeading = (currentHeading + 360) % 360;
 
@@ -683,7 +702,10 @@ function updateMarkerRotation(heading) {
     }
 }
 
-if (window.DeviceOrientationEvent) {
+// Lyssna i första hand på absolut kompassriktning (bäst stöd på Android)
+if ('ondeviceorientationabsolute' in window) {
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+} else if (window.DeviceOrientationEvent) {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission().then(state => {
             if (state === 'granted') {
@@ -691,10 +713,10 @@ if (window.DeviceOrientationEvent) {
             }
         }).catch(console.error);
     } else {
-        window.addEventListener('deviceorientationabsolute', handleOrientation, true) ||
         window.addEventListener('deviceorientation', handleOrientation, true);
     }
 }
+
 
 // -----------------------------------------------------------------
 // 7. Listvy & Flikväxling
