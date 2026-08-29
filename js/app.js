@@ -8,7 +8,6 @@ import { initAutoSync, syncPendingMarkers } from './sync.js';
 import { deleteMarker } from './db.js';
 import { exportToGPX, exportToJSON, importFromJSON } from './exporter.js';
 
-
 // Initiera synk-lyssnaren direkt vid appstart
 try { initAutoSync(); } catch (e) { console.warn(e); }
 
@@ -21,20 +20,15 @@ let markersMap = {};
 let userPositionMarker = null;
 let userAccuracyCircle = null;
 let currentCoords = null;
-let currentAccuracy = 0;
 let currentPhotoBase64 = null;
 let activeCategoryFilter = 'all';
 let searchQuery = '';
 let currentSortMode = 'newest'; 
-let activeNavMarkerId = null;
-let navLine = null;
 let currentHeading = 0;
-// Avbryter Gå till
+
+// Navigering ("Gå hit")
 let targetMarkerId = null;
 let navigationLine = null;
-
-
-
 
 // Initiera kartan centrerad på Sverige (med maxZoom angiven)
 const map = L.map('map', { 
@@ -42,14 +36,12 @@ const map = L.map('map', {
     maxZoom: 18 
 }).setView([62.0, 15.0], 5);
 
-
 // Skapa klustergruppen för markörer och lägg till den på kartan
 const markerClusterGroup = L.markerClusterGroup({
-    disableClusteringAtZoom: 16, // Slutar klustra när du zoomar in tillräckligt nära
-    maxClusterRadius: 40         // Radie i pixlar för hur tätt markörer samlas
+    disableClusteringAtZoom: 16,
+    maxClusterRadius: 40
 });
 map.addLayer(markerClusterGroup);
-
 
 setTimeout(() => {
     map.invalidateSize();
@@ -62,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         savedPlaces = [];
 
-        // 1. Hämta lokalt först för direkt visning (snabbare upplevelse)
+        // 1. Hämta lokalt först för direkt visning
         const stored = getLocalMarkers();
         if (stored && stored.length > 0) {
             savedPlaces = stored.map(place => ({
@@ -81,7 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
                         const loadedPlaces = [];
 
-                        // Töm klustret innan återuppritning för att unvika dubbletter
                         markerClusterGroup.clearLayers();
                         markersMap = {};
 
@@ -89,8 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (item.latitude === undefined && item.lat === undefined) return;
 
                             const itemId = String(item.id || item.Id || `marker_${Date.now()}_${index}`);
-
-                            // Hoppa över om markören är raderad lokalt
                             if (pendingDeletes.includes(itemId)) return;
 
                             const lat = Number(item.latitude !== undefined ? item.latitude : item.lat);
@@ -124,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch(sheetErr => console.warn("Kunde inte hämta från Google Sheets:", sheetErr));
         }
-
 
         updateMarkerCount();
         renderListView();
@@ -162,9 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderListView();
     });
 
-}); // Stänger DOMContentLoaded
-
-
+});
 
 // -----------------------------------------------------------------
 // 1. Kartlager & Kartväljare
@@ -228,7 +214,6 @@ if (toggleBtn && menu) {
         });
     });
 }
-
 
 // -----------------------------------------------------------------
 // 3. Bildkomprimering & Kategoriinmatning
@@ -299,7 +284,6 @@ document.getElementById('btn-mark')?.addEventListener('click', () => {
     if (currentCoords) {
         const coordsEl = document.getElementById('modal-coords');
         if (coordsEl) coordsEl.innerText = `${currentCoords[0].toFixed(6)}, ${currentCoords[1].toFixed(6)}`;
-  //      if (accEl) accEl.innerText = `±${Math.round(currentAccuracy)}m`;
 
         if (!selectedCategory) selectedCategory = safeCategories[0];
         const titleInput = document.getElementById('input-title');
@@ -433,12 +417,9 @@ function createPopupContent(place) {
   `;
 }
 
-
-
 function updateMarkerCount() {
     const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
 
-    // Räkna hur många platser som faktiskt matchar både sökning och aktiv kategori
     const visiblePlaces = savedPlaces.filter(item => {
         const itemCategory = item.category || item.categoryGroup || 'Övrigt';
         const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
@@ -450,16 +431,11 @@ function updateMarkerCount() {
         return matchesCategory && matchesSearch;
     });
 
-    // Uppdatera "Lista (X)" med antalet synliga/filtrerade platser
     document.querySelectorAll('.marker-count-val').forEach(el => {
         el.innerText = visiblePlaces.length;
     });
 }
 
-
-
-
-// Slår upp SVG-ikonen från CATEGORIES (kollar först exakt fyndnamn, sedan kategori)
 function getCategoryIcon(place) {
     const title = (place.title || '').toLowerCase().trim();
     const category = (place.category || place.categoryGroup || '').toLowerCase().trim();
@@ -508,10 +484,9 @@ function addPlaceToMap(place) {
     const itemCategory = place.category || place.categoryGroup || 'Övrigt';
     const isVisible = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
 
-if (isVisible) {
-    markerClusterGroup.addLayer(marker);
-}
-
+    if (isVisible) {
+        markerClusterGroup.addLayer(marker);
+    }
 
     markersMap[place.id] = marker;
 }
@@ -520,14 +495,12 @@ function focusMarkerOnMap(id) {
     const place = savedPlaces.find(p => String(p.id) === String(id));
     if (!place) return;
 
-    // Växla till kartvyn
     document.getElementById('list-view')?.classList.add('hidden');
     document.getElementById('map-view')?.classList.remove('hidden');
     updateTabStyles(document.getElementById('btn-show-map'), document.getElementById('btn-show-list'));
     
     map.invalidateSize();
 
-    // Panera till markören och öppna dess popup
     map.flyTo([Number(place.lat), Number(place.lng)], 17, { animate: true });
     if (markersMap[id]) {
         markersMap[id].openPopup();
@@ -535,8 +508,6 @@ function focusMarkerOnMap(id) {
 }
 
 window.focusMarkerOnMap = focusMarkerOnMap;
-
-
 
 // -----------------------------------------------------------------
 // 6. GPS-spårning
@@ -546,13 +517,8 @@ const myLocationIcon = L.divIcon({
     className: 'my-location-marker',
     html: `
         <div style="position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
-            <!-- Pulserande bakgrundscirkel -->
             <div class="animate-ping" style="position: absolute; width: 24px; height: 24px; background: rgba(59, 130, 246, 0.4); border-radius: 50%;"></div>
-            
-            <!-- Blå GPS-punkt -->
             <div style="position: absolute; width: 14px; height: 14px; background: #2563eb; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.35); z-index: 2;"></div>
-            
-            <!-- Roterande kompasspil -->
             <div id="user-heading-arrow" style="position: absolute; width: 36px; height: 36px; transition: transform 0.2s ease-out; z-index: 1;">
                 <svg viewBox="0 0 24 24" style="width: 100%; height: 100%; fill: #2563eb; filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.4));">
                     <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
@@ -564,11 +530,9 @@ const myLocationIcon = L.divIcon({
     iconAnchor: [18, 18]
 });
 
-
 function updatePosition(position, autoCenter = false) {
     const { latitude, longitude, accuracy } = position.coords;
     currentCoords = [latitude, longitude];
-    currentAccuracy = accuracy;
     
     const accText = `±${Math.round(accuracy)}m`;
     const badge = document.getElementById('gps-accuracy-badge');
@@ -597,19 +561,11 @@ function updatePosition(position, autoCenter = false) {
         }).addTo(map);
     }
 
-    if (activeNavMarkerId && savedPlaces.length > 0) {
-        const target = savedPlaces.find(p => String(p.id) === String(activeNavMarkerId));
+    // Uppdatera navigeringslinjen i realtid när GPS flyttar på sig
+    if (targetMarkerId && navigationLine) {
+        const target = savedPlaces.find(p => String(p.id) === String(targetMarkerId));
         if (target) {
-            const targetCoords = [Number(target.lat), Number(target.lng)];
-            if (navLine) {
-                navLine.setLatLngs([[latitude, longitude], targetCoords]);
-            } else {
-                navLine = L.polyline([[latitude, longitude], targetCoords], {
-                    color: '#2563eb',
-                    weight: 4,
-                    dashArray: '8, 8'
-                }).addTo(map);
-            }
+            navigationLine.setLatLngs([[latitude, longitude], [Number(target.lat), Number(target.lng)]]);
         }
     }
 
@@ -647,19 +603,14 @@ if ('serviceWorker' in navigator) {
 let hasReceivedAbsolute = false;
 
 function getAbsoluteHeading(event) {
-    // 1. iOS / WebKit (skickar färdig kompassriktning mot magnetisk nord)
     if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
         return event.webkitCompassHeading;
     }
 
-    // 2. Android / Standard deviceorientation
     if (event.alpha !== null && event.alpha !== undefined) {
         let heading = 360 - event.alpha;
-
-        // Korrigera för skärmens rotation (porträtt vs landskap)
         const screenOrientation = window.orientation || (screen.orientation && screen.orientation.angle) || 0;
         heading = (heading + screenOrientation) % 360;
-
         return heading < 0 ? heading + 360 : heading;
     }
 
@@ -670,12 +621,10 @@ function handleOrientation(event) {
     const rawHeading = getAbsoluteHeading(event);
     if (rawHeading === null) return;
 
-    // Om vi får data från 'deviceorientationabsolute', markera det
     if (event.type === 'deviceorientationabsolute') {
         hasReceivedAbsolute = true;
     }
 
-    // Om vi redan har fått absolut data, ignorera vanliga deviceorientation för att undvika dubbla anrop
     if (event.type === 'deviceorientation' && hasReceivedAbsolute) {
         return;
     }
@@ -683,7 +632,6 @@ function handleOrientation(event) {
     if (currentHeading === null) {
         currentHeading = rawHeading;
     } else {
-        // Hantera övergången runt 0/360 grader så att pilen inte snurrar ett helt varv vid passering av norr
         let diff = rawHeading - currentHeading;
         if (diff > 180) diff -= 360;
         if (diff < -180) diff += 360;
@@ -697,13 +645,11 @@ function handleOrientation(event) {
 function updateMarkerRotation(heading) {
     const arrowEl = document.getElementById('user-heading-arrow');
     if (arrowEl) {
-        // Mjuk CSS-övergång direkt på elementet istället för matematiskt tröskelfilter
         arrowEl.style.transition = 'transform 0.3s ease-out';
         arrowEl.style.transform = `rotate(${heading}deg)`;
     }
 }
 
-// Starta lyssnare på båda händelserna samtidigt (fallback-stöd)
 if (window.DeviceOrientationEvent) {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission().then(state => {
@@ -716,8 +662,6 @@ if (window.DeviceOrientationEvent) {
         window.addEventListener('deviceorientation', handleOrientation, true);
     }
 }
-
-
 
 // -----------------------------------------------------------------
 // 7. Listvy & Flikväxling
@@ -755,7 +699,6 @@ function applyCategoryFilter(category) {
     });
     
     applySearchFilter();
-
     renderFilterChips();
     renderListView();
     updateMapFilterBadge();
@@ -769,7 +712,6 @@ function renderSearchSuggestions() {
 
     const query = searchInput.value.toLowerCase().trim();
 
-    // Dölj dropdown om sökfältet är tomt
     if (query.length === 0) {
         container.innerHTML = '';
         container.classList.add('hidden');
@@ -778,7 +720,6 @@ function renderSearchSuggestions() {
 
     const matches = new Set();
     
-    // Sök igenom alla titlar, kategorier och anteckningar
     savedPlaces.forEach(item => {
         const title = item.title || '';
         const category = item.category || item.categoryGroup || '';
@@ -789,7 +730,7 @@ function renderSearchSuggestions() {
         if (notes.toLowerCase().includes(query)) matches.add(notes);
     });
 
-    const suggestions = Array.from(matches).slice(0, 5); // Visa max 5 förslag
+    const suggestions = Array.from(matches).slice(0, 5);
 
     if (suggestions.length === 0) {
         container.innerHTML = '';
@@ -797,7 +738,6 @@ function renderSearchSuggestions() {
         return;
     }
 
-    // Generera förslagslistan
     container.innerHTML = suggestions.map(text => `
         <button type="button" class="suggestion-item w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 transition flex items-center justify-between">
             <span class="truncate">${text}</span>
@@ -807,10 +747,8 @@ function renderSearchSuggestions() {
 
     container.classList.remove('hidden');
 
-// Klickhändelse när användaren väljer ett förslag
     container.querySelectorAll('.suggestion-item').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            // Hämta enbart texten från span med klassen .truncate
             const selectedText = e.currentTarget.querySelector('.truncate')?.innerText || e.currentTarget.innerText;
             
             if (searchInput) {
@@ -818,60 +756,49 @@ function renderSearchSuggestions() {
             }
             
             container.classList.add('hidden');
-
-            // Uppdatera filtreringen på kartan och listan samt den gröna badgen
             applySearchFilter();
             updateMapFilterBadge();
         });
     });
 }
 
-
 function applySearchFilter() {
     const searchInput = document.getElementById('search-input');
     const searchClearBtn = document.getElementById('search-clear');
     searchQuery = (searchInput?.value || '').toLowerCase().trim();
 
-    // Visa eller dölj kryss-knappen baserat på om det finns text
     if (searchQuery.length > 0) {
         searchClearBtn?.classList.remove('hidden');
     } else {
         searchClearBtn?.classList.add('hidden');
     }
 
-    // Uppdatera synligheten för varje markör på kartan
     Object.keys(markersMap).forEach(id => {
         const marker = markersMap[id];
         const place = savedPlaces.find(p => String(p.id) === String(id));
         if (!place) return;
 
-        // 1. Kategori-check
         const itemCategory = place.category || place.categoryGroup || 'Övrigt';
         const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
 
-        // 2. Sökords-check (matchar titel eller anteckning/beskrivning)
         const titleMatch = (place.title || '').toLowerCase().includes(searchQuery);
         const notesMatch = (place.notes || place.description || '').toLowerCase().includes(searchQuery);
         const matchesSearch = titleMatch || notesMatch;
 
-        // Markören ska bara synas på kartan om DEN MATCHAR BÅDE kategori och sökning!
-if (matchesCategory && matchesSearch) {
-    if (!markerClusterGroup.hasLayer(marker)) {
-        markerClusterGroup.addLayer(marker);
-    }
-} else {
-    if (markerClusterGroup.hasLayer(marker)) {
-        markerClusterGroup.removeLayer(marker);
-    }
-}
-
+        if (matchesCategory && matchesSearch) {
+            if (!markerClusterGroup.hasLayer(marker)) {
+                markerClusterGroup.addLayer(marker);
+            }
+        } else {
+            if (markerClusterGroup.hasLayer(marker)) {
+                markerClusterGroup.removeLayer(marker);
+            }
+        }
     });
 
     renderListView();
     updateMarkerCount();
 }
-
-
 
 function updateMapFilterBadge() {
     const badge = document.getElementById('active-filter-badge');
@@ -881,53 +808,41 @@ function updateMapFilterBadge() {
     const searchQuery = (document.getElementById('search-input')?.value || '').trim();
 
     if (searchQuery.length > 0) {
-        // Om användaren har sökt i sökrutan
         badgeText.innerText = `Visar: ${searchQuery}`;
         badge.classList.remove('hidden');
     } else if (activeCategoryFilter !== 'all') {
-        // Annars, om en kategori är vald
         badgeText.innerText = `Visar: ${activeCategoryFilter}`;
         badge.classList.remove('hidden');
     } else {
-        // Om varken sökning eller kategori är vald
         badge.classList.add('hidden');
     }
 }
 
-
 document.getElementById('active-filter-badge')?.addEventListener('click', (e) => {
     e.stopPropagation();
 
-    // 1. Rensa sökfältet
     const searchInput = document.getElementById('search-input');
     if (searchInput) searchInput.value = '';
 
-    // 2. Återställ sökningen och uppdatera vyer och badge
     applySearchFilter();
     applyCategoryFilter('all');
     updateMapFilterBadge();
 });
 
-
-// Reagera direkt när man skriver i sökfältet
 document.getElementById('search-input')?.addEventListener('input', () => {
     applySearchFilter();
-    updateMapFilterBadge(); // Uppdaterar den gröna knappen "Visar: ..." i realtid
+    updateMapFilterBadge();
     renderSearchSuggestions();
 });
 
-
-// Rensa sökfältet vid klick på krysset
 document.getElementById('search-clear')?.addEventListener('click', () => {
     const searchInput = document.getElementById('search-input');
     if (searchInput) searchInput.value = '';
     applySearchFilter();
-    updateMapFilterBadge(); // Återställer knappen när sökningen rensas
+    updateMapFilterBadge();
     renderSearchSuggestions();
 });
 
-
-// Dölj förslagsrutan när man klickar utanför sökfältet
 document.addEventListener('click', (e) => {
     const suggestions = document.getElementById('search-suggestions');
     const searchInput = document.getElementById('search-input');
@@ -936,15 +851,12 @@ document.addEventListener('click', (e) => {
     }
 });
 
-
-
 function renderListView() {
     const container = document.getElementById('list-container');
     if (!container) return;
 
     const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
     
-    // 1. Filtrera listan baserat på aktiv kategori & söktext
     let filtered = savedPlaces.filter(item => {
         const itemCategory = item.category || item.categoryGroup || 'Övrigt';
         const matchesCategory = activeCategoryFilter === 'all' || itemCategory === activeCategoryFilter;
@@ -958,8 +870,6 @@ function renderListView() {
 
     updateMarkerCount();
 
-
-    // 2. Sortering
     if (currentSortMode === 'distance' && currentCoords) {
         filtered.sort((a, b) => {
             const getMeters = (lat, lng) => {
@@ -978,15 +888,6 @@ function renderListView() {
         filtered.sort((a, b) => (b.timestamp || b.id) - (a.timestamp || a.id));
     }
 
-
-
-
-
-
-
-
-
-    // 3. Generera HTML
     if (filtered.length === 0) {
         container.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">Inga platser hittades</div>`;
         return;
@@ -1023,8 +924,6 @@ function renderListView() {
         `;
     }).join('');
 }
-
-
 
 const btnList = document.getElementById('btn-show-list');
 const btnMap = document.getElementById('btn-show-map');
@@ -1071,7 +970,6 @@ function renderFilterChips() {
         new Set(savedPlaces.map(item => item.category || item.categoryGroup || 'Övrigt'))
     ).filter(Boolean);
 
-    // "Alla" visar alltid totalt antal i registret (t.ex. 76)
     let html = `
     <button data-filter="all" class="filter-chip shrink-0 px-3 py-1.5 rounded-full ${
         activeCategoryFilter === 'all'
@@ -1107,9 +1005,8 @@ function renderFilterChips() {
     });
 }
 
-
 // -----------------------------------------------------------------
-// 8. Hamburgermeny & GPX Export
+// 8. Hamburgermeny & GPX / JSON Export
 // -----------------------------------------------------------------
 const btnHamburger = document.getElementById('btn-hamburger');
 const hamburgerMenu = document.getElementById('hamburger-menu');
@@ -1129,12 +1026,10 @@ document.getElementById('btn-export-gpx')?.addEventListener('click', () => {
     exportToGPX(savedPlaces);
 });
 
-// Exportera JSON
 document.getElementById('btn-export-json')?.addEventListener('click', () => {
     exportToJSON(savedPlaces);
 });
 
-// Importera JSON
 document.getElementById('input-import-json')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1143,7 +1038,6 @@ document.getElementById('input-import-json')?.addEventListener('change', (e) => 
         let addedCount = 0;
 
         importedPlaces.forEach(item => {
-            // Kontrollera att platsen inte redan finns (baserat på ID eller koordinater)
             const exists = savedPlaces.some(p => String(p.id) === String(item.id));
             
             if (!exists && item.lat && item.lng) {
@@ -1152,7 +1046,6 @@ document.getElementById('input-import-json')?.addEventListener('change', (e) => 
                     id: String(item.id || `marker_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`)
                 };
 
-                // Spara lokalt och lägg på kartan
                 saveMarkerLocally(formatted);
                 savedPlaces.push(formatted);
                 addPlaceToMap(formatted);
@@ -1165,11 +1058,9 @@ document.getElementById('input-import-json')?.addEventListener('change', (e) => 
         renderFilterChips();
 
         alert(`Återställning klar! Importerade ${addedCount} nya platser.`);
-        e.target.value = ''; // Nollställ filväljaren
+        e.target.value = '';
     });
 });
-
-
 
 // -----------------------------------------------------------------
 // 9. Bekräftelsemodal (Promise-baserad)
@@ -1206,7 +1097,6 @@ function showConfirm(message, title = "Ta bort markör") {
     });
 }
 
-// Global radera-funktion
 window.removeCurrentMarker = async function(id) {
     const confirmed = await showConfirm("Vill du ta bort denna markör?", "Ta bort markör");
     if (!confirmed) return;
@@ -1244,40 +1134,9 @@ window.removeCurrentMarker = async function(id) {
     }
 };
 
-window.startNavigationTo = function(id) {
-    const target = savedPlaces.find(p => String(p.id) === String(id));
-    if (!target) return;
-
-    // Om vi redan navigerar till denna markör – stäng av navigeringslinjen
-    if (activeNavMarkerId === String(id)) {
-        activeNavMarkerId = null;
-        if (navLine) {
-            map.removeLayer(navLine);
-            navLine = null;
-        }
-        return;
-    }
-
-    activeNavMarkerId = String(id);
-
-    if (currentCoords) {
-        const targetCoords = [Number(target.lat), Number(target.lng)];
-        if (navLine) {
-            navLine.setLatLngs([currentCoords, targetCoords]);
-        } else {
-            navLine = L.polyline([currentCoords, targetCoords], {
-                color: '#2563eb',
-                weight: 4,
-                dashArray: '8, 8'
-            }).addTo(map);
-        }
-    }
-};
-
-
-// Variabel för att hålla reda på den ritade ruttlinjen
-let currentRouteLayer = null;
-
+// -----------------------------------------------------------------
+// 10. Ruttritning & Externa Kartor
+// -----------------------------------------------------------------
 function toggleRouteTo(id, destLat, destLng) {
     if (targetMarkerId === String(id)) {
         stopRouteTo();
@@ -1323,7 +1182,6 @@ function stopRouteTo() {
     }
 }
 
-// Öppnar navigeringskartan i ny flik
 function openExternalMap(lat, lng) {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     window.open(url, '_blank');
