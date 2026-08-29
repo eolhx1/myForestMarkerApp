@@ -299,7 +299,7 @@ document.getElementById('btn-mark')?.addEventListener('click', () => {
     if (currentCoords) {
         const coordsEl = document.getElementById('modal-coords');
         if (coordsEl) coordsEl.innerText = `${currentCoords[0].toFixed(6)}, ${currentCoords[1].toFixed(6)}`;
-        if (accEl) accEl.innerText = `±${Math.round(currentAccuracy)}m`;
+  //      if (accEl) accEl.innerText = `±${Math.round(currentAccuracy)}m`;
 
         if (!selectedCategory) selectedCategory = safeCategories[0];
         const titleInput = document.getElementById('input-title');
