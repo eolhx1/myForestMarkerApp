@@ -1,10 +1,13 @@
 <!-- filename: index.html -->
-
 <!DOCTYPE html>
 <html lang="sv">
 <head>
 
-    <!-- Visar felmeddelanden direkt på skärmen på Android -->
+    <!-- ========================================== -->
+    <!--  FELHANTERING                              -->
+    <!-- ========================================== -->
+    <!-- Fångar upp och visar JavaScript-fel direkt via alert -->
+    <!-- Användbart vid mobiltestning) -->
     <script>
         window.onerror = function(msg, url, line, col, error) {
             alert("FEL: " + msg + "\nRad: " + line + "\nFil: " + url);
@@ -14,45 +17,59 @@
             alert("UNHANDLED PROMISE: " + event.reason);
         };
     </script>
-
-
-    <!-- ? -->
+    
+    <!-- ========================================== -->
+    <!-- 1. SKÄRMINFORMATION                        -->
+    <!-- ========================================== --> 
+    <!-- Teckenkodning (utf-8) samt inställningar för mobila skärmar och zoomning -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Skogsmarkören</title>
 
+    <!-- PWA Web App Manifest och tematisk färg för mobila webbläsares adressfält -->
     <link rel="manifest" href="manifest.json">
-
     <meta name="theme-color" content="#059669">
 
-    <!-- Tailwind CSS -->
+
+    <!-- ========================================== -->
+    <!-- 2. EXTERNA BIBLIOTEK & RESURSER            -->
+    <!-- ========================================== -->
+    <!-- Tailwind CSS (Verktygsklasser för design) -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- 1. Leaflet CSS & JS -->
+    <!-- Leaflet CSS & JS (Kartsystem) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- 2. MarkerCluster CSS & JS (Måste laddas EFTER Leaflet) -->
+    <!-- MarkerCluster CSS & JS (Klustring av markörer på kartan - ladda EFTER Leaflet) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
-    <!-- 3. Appens egen kod -->
+
+    <!-- ========================================== -->
+    <!-- 3. APPENS EGEN SKRIPTMODUL                 -->
+    <!-- ========================================== -->
     <script type="module" src="js/app.js"></script>
 
+
+    <!-- ========================================== -->
+    <!-- 4. STILAR (CSS)                            -->
+    <!-- ========================================== -->
     <style>
-        /* ? */
+        /* Standardtypsnitt för applikationen (Systemtypsnitt för hög prestanda på mobil) */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-        /* Kartan */
+
+        /* Kartbehållare */
         #map {
             height: 100%;
             width: 100%;
         }
 
-        /* modaler/dialoger */
+        /* Nativ dialog/modal styling */
         dialog {
             border: none;
             border-radius: 16px;
@@ -70,7 +87,7 @@
             backdrop-filter: blur(4px);
         }
 
-        /* Standard rubrik och text inuti modalen */
+        /* Rubriker i dialoger */
         dialog h2, dialog h3 {
             margin-top: 0;
             margin-bottom: 12px;
@@ -90,6 +107,7 @@
             font-family: system-ui, -apple-system, sans-serif;
         }
 
+        /* ? */
         dialog input,
         dialog select,
         dialog textarea {
@@ -104,6 +122,7 @@
             transition: border-color 0.2s, box-shadow 0.2s;
         }
 
+        /* ? */
         dialog input:focus,
         dialog select:focus,
         dialog textarea:focus {
@@ -111,7 +130,7 @@
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
         }
 
-        /* Layout för knapparna längst ner */
+        /* Knappar och layout i dialoger */
         dialog form,
         dialog .buttons {
             display: flex;
@@ -120,7 +139,7 @@
             margin-top: 16px;
         }
 
-        /* Knappsammansättning */
+        /* ? */
         dialog button {
             padding: 10px 16px;
             border: none;
@@ -132,11 +151,12 @@
             font-family: system-ui, -apple-system, sans-serif;
         }
 
+        /* ? */
         dialog button:active {
             transform: scale(0.97);
         }
 
-        /* Avbryt/Stäng-knappar (ljusgrå) */
+        /* Sekundära knappar (Avbryt/Stäng) */
         dialog button[type="cancel"],
         dialog button.cancel,
         dialog button.btn-cancel {
@@ -144,13 +164,14 @@
             color: #4b5563;
         }
 
+        /* ? */
         dialog button[type="cancel"]:hover,
         dialog button.cancel:hover,
         dialog button.btn-cancel:hover {
             background-color: #e5e7eb;
         }
 
-        /* Spara/Bekräfta-knappar (blå) */
+        /* Primära knappar (Spara/Bekräfta) */
         dialog button[type="submit"],
         dialog button.save,
         dialog button.btn-save,
@@ -159,6 +180,7 @@
             color: #ffffff;
         }
 
+        /* ? */
         dialog button[type="submit"]:hover,
         dialog button.save:hover,
         dialog button.btn-save:hover,
@@ -166,7 +188,7 @@
             background-color: #1d4ed8;
         }
 
-        /* Animation för modalen */
+        /* Övergångsanimationer */
         @keyframes modalFadeIn {
             from {
                 opacity: 0;
@@ -182,12 +204,12 @@
 
 <body class="bg-slate-50 text-slate-800 flex flex-col h-[100dvh] w-screen overflow-hidden">
 
-
-    <!-- Header -->
-    <!-- Top Header med CSS Grid och Hamburgermeny -->
+    <!-- ========================================== -->
+    <!-- 5. TOPPBAR & HUVUDMENY (HEADER)            -->
+    <!-- ========================================== -->
     <header class="grid grid-cols-3 items-center px-4 py-2.5 bg-white border-b border-slate-200 sticky top-0 z-[2000]">
 
-        <!-- Vänster: GPS Badge (Ligger bergfast till vänster) -->
+        <!-- Vänster: GPS-noggrannhet -->
         <div class="justify-self-start">
             <span class="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-semibold border border-slate-200/80 shadow-sm">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -195,7 +217,7 @@
             </span>
         </div>
 
-        <!-- Mitten: Logotyp (Ligger garanterat exakt i mitten) -->
+        <!-- Mitten: App-logotyp & titel -->
         <div class="justify-self-center flex items-center gap-2">
             <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-lg shadow-inner">
                 🍄
@@ -208,7 +230,7 @@
             </div>
         </div>
 
-        <!-- Höger: Hamburgermeny (Subtil och framtidssäker) -->
+        <!-- Höger: Hamburgermeny med export/import -->
         <div class="justify-self-end relative">
             <button id="btn-hamburger" class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 active:scale-95 transition">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,15 +238,12 @@
                 </svg>
             </button>
 
-            <!-- Dropdown-meny -->
+            <!-- Menyinnehåll -->
             <div id="hamburger-menu" class="hidden absolute right-4 top-16 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 w-56 z-[1000]">
-
-                <!-- Lägger till knappen exportera till GPX -->
                 <button id="btn-export-gpx" class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
                     <span>📥</span> Exportera till GPX
                 </button>
 
-                <!-- I #hamburger-menu, lägg till dessa alternativ -->
                 <button id="btn-export-json" class="w-full text-left flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
                     <span>💾</span> Exportera säkerhetskopia (JSON)
                 </button>
@@ -243,9 +262,12 @@
 
     </header>
 
-    <!-- Controls -->
-    <!-- Flikväljare & Åtgärder -->
+
+    <!-- ========================================== -->
+    <!-- 6. NAVIGERING OCH HUVUDÅTGÄRDER            -->
+    <!-- ========================================== -->
     <div class="px-4 py-2 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between gap-2">
+        <!-- Omkopplare mellan Kartvy och Listvy -->
         <div class="flex bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-medium border border-slate-300/40">
             <button id="btn-show-map" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 bg-white text-emerald-900 font-semibold shadow-sm transition">
                 🗺️ <span>Karta</span>
@@ -256,18 +278,24 @@
             </button>
         </div>
 
+        <!-- Huvudknapp för att spara plats -->
         <button id="btn-mark" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition">
             <span>📍</span> Markera position
         </button>
     </div>
 
 
-    <!-- Main View Area -->
+    <!-- ========================================== -->
+    <!-- 7. HUVUDINNEHÅLL (KARTA & LISTA)          -->
+    <!-- ========================================== -->
     <div class="relative flex-1 h-full overflow-hidden">
 
-        <!-- 1. KARTVY -->
+        <!-- -------------------------------------- -->
+        <!-- 7A. KARTVY                            -->
+        <!-- -------------------------------------- -->
         <div id="map-view" class="w-full h-full relative overflow-hidden">
-            <!-- Kartväljare Meny -->
+            
+            <!-- Kartväljare (Dropdown) -->
             <div class="absolute top-3 left-3 z-[400] flex flex-col items-start gap-2">
                 <button id="map-selector-toggle" class="bg-white/95 backdrop-blur border border-slate-200 text-slate-800 px-3 py-1.5 rounded-full shadow text-xs font-bold flex items-center gap-1.5 hover:bg-slate-50 transition">
                     <span>🥞 🌲</span>
@@ -275,50 +303,37 @@
                     <span class="text-[10px] text-slate-400">▼</span>
                 </button>
 
-                <!-- Dropdown Meny -->
                 <div id="map-selector-menu" class="hidden bg-white/95 backdrop-blur border border-slate-200 rounded-2xl p-2 shadow-xl flex flex-col gap-1.5 w-52 transition">
                     <button data-tile="topo" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-emerald-500 bg-emerald-50/50">
                         <span class="text-xl">🌲</span>
                         <div>
-                            <div class="font-bold text-xs text-slate-800">
-                                Skogstopo
-                            </div>
-                            <div class="text-[10px] text-slate-500">
-                                Höjdkurvor & stigar
-                            </div>
+                            <div class="font-bold text-xs text-slate-800">Skogstopo</div>
+                            <div class="text-[10px] text-slate-500">Höjdkurvor & stigar</div>
                         </div>
                     </button>
 
                     <button data-tile="satellite" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
                         <span class="text-xl">🛰️</span>
                         <div>
-                            <div class="font-bold text-xs text-slate-800">
-                                Satellitvy
-                            </div>
-                            <div class="text-[10px] text-slate-500">
-                                Esri flygfoton
-                            </div>
+                            <div class="font-bold text-xs text-slate-800">Satellitvy</div>
+                            <div class="text-[10px] text-slate-500">Esri flygfoton</div>
                         </div>
                     </button>
 
                     <button data-tile="osm" class="map-option-btn p-2 rounded-xl flex items-center gap-3 hover:bg-slate-100 text-left transition border border-transparent">
                         <span class="text-xl">🗺️</span>
                         <div>
-                            <div class="font-bold text-xs text-slate-800">
-                                Standardkarta
-                            </div>
-                            <div class="text-[10px] text-slate-500">
-                                Vägar & översikt
-                            </div>
+                            <div class="font-bold text-xs text-slate-800">Standardkarta</div>
+                            <div class="text-[10px] text-slate-500">Vägar & översikt</div>
                         </div>
                     </button>
                 </div>
             </div>
 
-            <!-- Själva Kartan -->
+            <!-- Själva Leaflet-kartan renderas här -->
             <div id="map" class="z-0"></div>
 
-            <!-- ÅTERSTÄLL FILTER-INDIKATOR -->
+            <!-- Aktiv Filter-indikator över kartan -->
             <div id="active-filter-badge" class="hidden absolute bottom-14 left-1/2 -translate-x-1/2 z-[2000] cursor-pointer pointer-events-auto">
                 <div class="bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 hover:bg-emerald-700 transition">
                     <span id="active-filter-text">Visar: Kategori</span>
@@ -326,14 +341,14 @@
                 </div>
             </div>
 
-            <!-- Floating Buttons Right (Samma som du redan hade) -->
+            <!-- Snabbknapp för omcentrering -->
             <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
                 <button id="btn-recenter" class="w-10 h-10 bg-white rounded-2xl shadow flex items-center justify-center text-blue-600 border border-slate-200 font-bold text-lg" title="Centrera på min position">
                     🎯
                 </button>
             </div>
 
-            <!-- Map Overlay Bottom Footer -->
+            <!-- Kartfot: visar totalt antal platser -->
             <div class="absolute bottom-4 left-3 z-[400] bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow text-xs font-medium text-slate-700 flex items-center gap-2 border border-slate-200">
                 <span class="flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -342,29 +357,29 @@
             </div>
         </div>
 
-        <!-- 2. LISTVY -->
+        <!-- -------------------------------------- -->
+        <!-- 7B. LISTVY                            -->
+        <!-- -------------------------------------- -->
         <div id="list-view" class="hidden w-full h-full p-4 overflow-y-auto bg-slate-50">
             <div class="max-w-md mx-auto w-full">
 
-                <!-- Sök & Filter (Ligger nu först och är sticky) -->
+                <!-- Sökfält och förslag -->
                 <div class="space-y-3 sticky top-0 bg-slate-50 pt-1 pb-3 z-10">
-                    <!-- Sökfält med rensa-kryss -->
                     <div class="relative shadow-sm">
                         <input
-                        type="text"
-                        id="search-input"
-                        placeholder="Sök på titel eller anteckning..."
-                        class="w-full pl-9 pr-9 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            type="text"
+                            id="search-input"
+                            placeholder="Sök på titel eller anteckning..."
+                            class="w-full pl-9 pr-9 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         >
                         <span class="absolute left-3 top-2.5 text-slate-400 text-sm">🔍</span>
 
-                        <!-- Kryss-knapp (dold som standard) -->
                         <button
                             id="search-clear"
                             type="button"
                             class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 w-5 h-5 flex items-center justify-center text-xs font-bold rounded-full bg-slate-100 transition"
                             title="Rensa sökning"
-                            >
+                        >
                             ✕
                         </button>
                     </div>
@@ -372,8 +387,7 @@
                     <div id="search-suggestions" class="hidden absolute top-full left-0 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl mt-1.5 z-50 overflow-hidden divide-y divide-slate-100"></div>
                 </div>
 
-
-                <!-- Sorteringsval -->
+                <!-- Sorteringsalternativ -->
                 <div class="flex items-center justify-between px-1 text-xs">
                     <span class="text-slate-400 font-medium text-[11px]">Sortera efter:</span>
                     <div class="flex gap-1 bg-slate-200/60 p-1 rounded-xl">
@@ -386,32 +400,38 @@
                     </div>
                 </div>
 
-                <!-- Snabbfilter för kategorier -->
-                <div id="filter-chips" class="flex gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+                <!-- Snabbfilter (Kategorichips) -->
+                <div id="filter-chips" class="flex gap-2 overflow-x-auto pb-1 text-xs no-scrollbar mt-2">
                     <button data-filter="all" class="filter-chip active-chip shrink-0 px-3 py-1.5 rounded-full bg-emerald-600 text-white font-semibold shadow-sm">
                         Alla
                     </button>
                 </div>
             </div>
 
-            <!-- Listan med platser (Ligger nu under sökfältet) -->
-            <div id="list-container" class="mt-2 space-y-4"></div>
-
+            <!-- Dynamisk lista över alla sparade platser -->
+            <div id="list-container" class="mt-2 space-y-4 max-w-md mx-auto"></div>
         </div>
+
     </div>
 
-    <!-- Modal: Markera denna plats -->
+
+    <!-- ========================================== -->
+    <!-- 8. MODALER & DIALOGER                      -->
+    <!-- ========================================== -->
+
+    <!-- -------------------------------------- -->
+    <!-- 8A. MODAL: MARKERA & SPARA PLATS       -->
+    <!-- -------------------------------------- -->
     <div id="save-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
         <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
 
+            <!-- Modal-huvud -->
             <div class="bg-emerald-800 text-white p-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <span class="text-2xl">🍄</span>
                     <div>
                         <h2 class="font-bold text-base leading-tight">Markera denna plats</h2>
-                        <p class="text-xs text-emerald-200">
-                            GPS-koordinater och information sparas
-                        </p>
+                        <p class="text-xs text-emerald-200">GPS-koordinater och information sparas</p>
                     </div>
                 </div>
                 <button id="modal-close" class="w-8 h-8 rounded-full bg-emerald-900/50 hover:bg-emerald-900 flex items-center justify-center text-white text-lg font-bold">
@@ -419,28 +439,32 @@
                 </button>
             </div>
 
+            <!-- Modal-innehåll / Formulär -->
             <div class="p-4 overflow-y-auto space-y-5 flex-1 text-slate-800 text-xs">
+                
+                <!-- GPS-koordinatsvisning -->
                 <div class="bg-slate-50 border border-slate-200 p-3 rounded-2xl flex items-center justify-between">
                     <div class="space-y-0.5">
                         <div class="font-mono text-sm font-semibold text-slate-800 flex items-center gap-2">
                             <span id="modal-coords">00.000000, 00.000000</span>
                         </div>
-                        <p class="text-[11px] text-slate-500">
-                            WGS84 GPS-koordinater
-                        </p>
+                        <p class="text-[11px] text-slate-500">WGS84 GPS-koordinater</p>
                     </div>
                 </div>
 
+                <!-- Kategorival (Grid fylls via JS) -->
                 <div>
                     <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-2">VAD FINNS PÅ PLATSEN?</label>
                     <div id="category-grid" class="grid grid-cols-3 gap-2"></div>
                 </div>
 
+                <!-- Rubrik/Titel -->
                 <div>
                     <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">NAMN / RUBRIK PÅ PLATSEN</label>
                     <input type="text" id="input-title" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-medium focus:outline-none focus:border-emerald-600 focus:bg-white transition" placeholder="t.ex. Gula kantareller i mossig skog">
                 </div>
 
+                <!-- Mängd/Bestånd -->
                 <div>
                     <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">MÄNGD / BESTÅND</label>
                     <div id="amount-selector" class="grid grid-cols-2 gap-2">
@@ -451,11 +475,13 @@
                     </div>
                 </div>
 
+                <!-- Anteckningar -->
                 <div>
                     <label class="block font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1.5">ANTECKNINGAR & TIPS (VALFRITT)</label>
                     <textarea id="input-notes" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-emerald-600 focus:bg-white transition" placeholder="t.ex. Växer under gamla granar, bäst att besöka efter regn..."></textarea>
                 </div>
 
+                <!-- Fotokamera / Bilduppladdning -->
                 <div class="mt-3">
                     <label class="block text-xs font-semibold text-slate-600 mb-1">📷 Ta foto / Välj bild</label>
                     <div class="flex items-center gap-2">
@@ -470,6 +496,7 @@
                 </div>
             </div>
 
+            <!-- Modal-fot med spara-knapp -->
             <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end">
                 <button id="btn-save-confirm" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 px-6 rounded-2xl shadow-md flex items-center justify-center gap-2">
                     📍 Markera & Spara plats
@@ -478,7 +505,9 @@
         </div>
     </div>
 
-    <!-- Custom Confirm Modal -->
+    <!-- -------------------------------------- -->
+    <!-- 8B. MODAL: RADERA BEKRÄFTELSE          -->
+    <!-- -------------------------------------- -->
     <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 transform transition-all space-y-4">
             <div class="text-center space-y-2">
