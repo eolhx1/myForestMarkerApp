@@ -423,6 +423,9 @@ function openEditModal(id) {
 }
 window.openEditModal = openEditModal;
 
+// ==========================================
+// SPARLOGIK UTAN SLAGIT SAMMAN TEXT
+// ==========================================
 async function handleSaveMarker(e) {
     e.preventDefault();
 
@@ -448,9 +451,9 @@ async function handleSaveMarker(e) {
                     title,
                     categoryGroup: catGroup,
                     category: catGroup,
-                    description: notes ? `${state.selectedAmount}. ${notes}` : state.selectedAmount,
+                    description: notes,
                     amount: state.selectedAmount,
-                    notes,
+                    notes: notes,
                     photo: photoBase64 || existing.photo,
                     synced: false,
                     syncStatus: 'pending'
@@ -483,9 +486,9 @@ async function handleSaveMarker(e) {
             title,
             categoryGroup: catGroup,
             category: catGroup,
-            description: notes ? `${state.selectedAmount}. ${notes}` : state.selectedAmount,
+            description: notes,
             amount: state.selectedAmount,
-            notes,
+            notes: notes,
             lat: state.currentCoords[0],
             lng: state.currentCoords[1],
             photo: photoBase64,
@@ -563,6 +566,9 @@ function getCategoryIcon(place) {
     return `<svg viewBox="0 0 36 36" class="w-6 h-6"><circle cx="18" cy="14" r="7" fill="#EF4444"/><path fill="#DC2626" d="M18 21l-5 11h10l-5-11z"/><circle cx="18" cy="14" r="3" fill="#FFFFFF"/></svg>`;
 }
 
+// ==========================================
+// SEPARERAD POPUP-LAYOUT
+// ==========================================
 function createPopupContent(place) {
     const latNum = Number(place.lat);
     const lngNum = Number(place.lng);
@@ -570,12 +576,11 @@ function createPopupContent(place) {
     const lngFormatted = !isNaN(lngNum) ? lngNum.toFixed(5) : '0.00000';
 
     const titleText = place.title || place.name || 'Skogsfynd';
-    const noteText = place.description || place.notes || place.note || '';
     const categoryText = place.category || place.categoryGroup || 'Övrigt';
-
-    const notesHTML = noteText 
-        ? `<p class="text-xs text-slate-600 italic mt-2 leading-relaxed">"${noteText}"</p>` 
-        : `<p class="text-xs text-slate-400 italic mt-2">Inga anteckningar angivna.</p>`;
+    
+    // Separera mängd och anteckningar
+    const amountText = place.amount || '';
+    const noteText = place.notes || place.description || '';
 
     const isNavigating = state.targetMarkerId === String(place.id);
 
@@ -593,13 +598,26 @@ function createPopupContent(place) {
         </div>
       </div>
 
-      <span class="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-medium px-2.5 py-0.5 rounded-full mb-1">
-        ${categoryText}
-      </span>
+      <!-- Kategori och Mängd/Bestånd i separata badges -->
+      <div class="flex flex-wrap items-center gap-1 mb-2">
+        <span class="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-medium px-2.5 py-0.5 rounded-full">
+          ${categoryText}
+        </span>
+        ${amountText ? `
+        <span class="inline-block bg-slate-100 text-slate-700 text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-slate-200">
+          📦 ${amountText}
+        </span>
+        ` : ''}
+      </div>
 
-      ${notesHTML}
+      <!-- Anteckningar & Tips i ett eget fält -->
+      ${noteText ? `
+      <div class="text-xs text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100 italic leading-relaxed mb-2">
+        "${noteText}"
+      </div>
+      ` : ''}
 
-      <div class="text-[11px] text-slate-500 mt-2 font-mono">
+      <div class="text-[11px] text-slate-500 font-mono">
         📍 ${latFormatted}, ${lngFormatted}
       </div>
 
@@ -617,6 +635,9 @@ function createPopupContent(place) {
     </div>
   `;
 }
+
+
+
 
 function addPlaceToMap(place) {
     if (state.markersMap[place.id]) {
