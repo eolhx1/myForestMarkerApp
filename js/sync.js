@@ -1,12 +1,16 @@
-// 
+//
 // filename: js/sync.js
+// Logik för automatisk synkronisering mot Google Sheets (Google Apps Script)
 //
 
 import { SCRIPT_URL } from './config.js';
 import { getLocalMarkers, markAsSynced } from './storage.js';
 
+// -----------------------------------------------------------------
+// Initierar automatisk synkronisering vid nätverksändringar.
+// -----------------------------------------------------------------
 export function initAutoSync() {
-  // Lyssna på när mobilen får tillbaka täckning
+  // Lyssna på när enheten får tillbaka täckning
   window.addEventListener('online', () => {
     console.log('📶 Mobiltäckning tillbaka! Startar synkronisering...');
     syncPendingMarkers();
@@ -18,31 +22,60 @@ export function initAutoSync() {
   }
 }
 
-// Samlad funktion för att synka både borttagningar och nya markörer
+// -----------------------------------------------------------------
+// Synkroniserar både väntande raderingar och nya/ändrade markörer.
+// -----------------------------------------------------------------
 export async function syncPendingMarkers() {
-    if (!navigator.onLine) return;
+  if (!navigator.onLine) return;
 
-    // 1. Synka sparade raderingar först
+  // 1. Synka sparade raderingar först
+  await syncPendingDeletes();
+
+  // 2. Synka osynkade nya markörer
+  await syncUnsyncedMarkers();
+}
+
+// -----------------------------------------------------------------
+// Hjälpfunktion för att hantera raderingar som gjorts offline.
+// -----------------------------------------------------------------
+async function syncPendingDeletes() {
+  try {
     const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
-    if (pendingDeletes.length > 0) {
-        for (const id of pendingDeletes) {
-            try {
-                await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'delete', id: id })
-                });
-            } catch (e) {
-                console.warn("Kunde inte synka radering för ID:", id);
-            }
-        }
-        localStorage.removeItem('pendingDeletes');
+    if (pendingDeletes.length === 0) return;
+
+    const remainingDeletes = [];
+
+    for (const id of pendingDeletes) {
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'delete', id: String(id) })
+        });
+      } catch (e) {
+        console.warn(`Kunde inte synka radering för ID ${id}:`, e);
+        remainingDeletes.push(id);
+      }
     }
 
-    // 2. Synka osynkade nya markörer om SCRIPT_URL finns
-    if (!SCRIPT_URL) return;
+    if (remainingDeletes.length > 0) {
+      localStorage.setItem('pendingDeletes', JSON.stringify(remainingDeletes));
+    } else {
+      localStorage.removeItem('pendingDeletes');
+    }
+  } catch (err) {
+    console.error('Fel vid hantering av väntande raderingar:', err);
+  }
+}
 
+// -----------------------------------------------------------------
+// Hjälpfunktion för att skicka nya/ändrade markörer till servern.
+// -----------------------------------------------------------------
+async function syncUnsyncedMarkers() {
+  if (!SCRIPT_URL) return;
+
+  try {
     const allMarkers = getLocalMarkers();
     const unsynced = allMarkers.filter(m => !m.synced);
 
@@ -51,19 +84,21 @@ export async function syncPendingMarkers() {
     console.log(`Hittade ${unsynced.length} osynkade markörer. Laddar upp...`);
 
     for (const marker of unsynced) {
-        try {
-            // Skicka till Google Apps Script via POST
-            const response = await fetch(SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(marker)
-            });
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(marker)
+        });
 
-            // Om vi använder no-cors eller om responsen är ok
-            markAsSynced(marker.id);
-            console.log(`✅ Synkad till Google Sheets: ${marker.title}`);
-        } catch (error) {
-            console.warn(`⏳ Kunde inte synka ${marker.title} just nu (saknar täckning/serverfel).`, error);
-        }
+        markAsSynced(marker.id);
+        console.log(`✅ Synkad till Google Sheets: ${marker.title}`);
+      } catch (error) {
+        console.warn(`⏳ Kunde inte synka ${marker.title} just nu.`, error);
+      }
     }
+  } catch (err) {
+    console.error('Fel vid synkronisering av markörer:', err);
+  }
 }

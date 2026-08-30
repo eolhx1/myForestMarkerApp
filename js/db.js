@@ -1,15 +1,19 @@
 //
 // filename: db.js
+// Hantering av IndexedDB för lokal databaslagring och bakgrundssynkronisering
 //
 
 import { SCRIPT_URL } from './config.js';
 
 const DB_NAME = 'ForestMapDB';
-const DB_VERSION = 2; // Höjt versionsnummer tvingar webbläsaren att skapa tabellen 'markers'
+const DB_VERSION = 2;
 const STORE_NAME = 'markers';
 
 let db = null;
 
+// -----------------------------------------------------------------
+// Initierar IndexedDB-databasen och skapar ObjectStore vid behov.
+// -----------------------------------------------------------------
 export function initDB() {
   return new Promise((resolve, reject) => {
     if (db) {
@@ -20,7 +24,7 @@ export function initDB() {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = (e) => {
-      console.error("IndexedDB-fel:", e.target.error);
+      console.error('IndexedDB-fel:', e.target.error);
       reject(e.target.error);
     };
 
@@ -38,13 +42,16 @@ export function initDB() {
   });
 }
 
+// -----------------------------------------------------------------
+// Sparar eller uppdaterar en markör i IndexedDB.
+// -----------------------------------------------------------------
 export async function saveMarker(place) {
   const dbInstance = await initDB();
-  
+
   return new Promise((resolve, reject) => {
     const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    
+
     place.syncStatus = place.syncStatus || 'pending';
     const request = store.put(place);
 
@@ -61,8 +68,12 @@ export async function saveMarker(place) {
   });
 }
 
+// -----------------------------------------------------------------
+// Hämtar alla sparade markörer från IndexedDB.
+// -----------------------------------------------------------------
 export async function getAllMarkers() {
   const dbInstance = await initDB();
+
   return new Promise((resolve, reject) => {
     const tx = dbInstance.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
@@ -73,8 +84,12 @@ export async function getAllMarkers() {
   });
 }
 
+// -----------------------------------------------------------------
+// Tar bort en markör från IndexedDB baserat på ID.
+// -----------------------------------------------------------------
 export async function deleteMarker(id) {
   const dbInstance = await initDB();
+
   return new Promise((resolve, reject) => {
     const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
@@ -85,9 +100,24 @@ export async function deleteMarker(id) {
   });
 }
 
+// -----------------------------------------------------------------
+// Synkroniserar alla väntande (pending) markörer till servern.
+// -----------------------------------------------------------------
+export async function syncPendingMarkers() {
+  if (!navigator.onLine) return;
+  const places = await getAllMarkers();
+  const pending = places.filter(p => p.syncStatus === 'pending');
+
+  for (const place of pending) {
+    await syncSingleMarker(place);
+  }
+}
+
+// -----------------------------------------------------------------
+// Hjälpfunktion för att skicka en enskild markör till Google Sheets.
+// -----------------------------------------------------------------
 async function syncSingleMarker(place) {
   try {
-    // Förbered nytt payload-objekt som matchar vad Kod.gs förväntar sig
     const payload = {
       title: place.title || '',
       categoryGroup: place.categoryGroup || place.category || '',
@@ -105,22 +135,12 @@ async function syncSingleMarker(place) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
     });
-    
-    // Uppdatera status lokalt efter sändning
+
     place.syncStatus = 'synced';
     const dbInstance = await initDB();
     const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).put(place);
   } catch (err) {
-    console.warn("Bakgrundssynk misslyckades, sparad lokalt:", err);
-  }
-}
-
-export async function syncPendingMarkers() {
-  if (!navigator.onLine) return;
-  const places = await getAllMarkers();
-  const pending = places.filter(p => p.syncStatus === 'pending');
-  for (const place of pending) {
-    await syncSingleMarker(place);
+    console.warn('Bakgrundssynk misslyckades, sparad lokalt:', err);
   }
 }
