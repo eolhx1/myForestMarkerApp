@@ -1,13 +1,21 @@
 //
-// filename: js/storage.js
+// filename: storage.js
 // Logik för lokal lagring (localStorage) och bildkomprimering
 //
 
+// ==========================================
+// 1. GLOBALA KONSTANTER OCH INITIALISERING
+// ==========================================
+
 const STORAGE_KEY = 'skogsmarkoren_markers';
 
-// -----------------------------------------------------------------
-// Hämtar alla sparade markörer från localStorage.
-// -----------------------------------------------------------------
+// ==========================================
+// 2. LOKAL LAGRINGSHANTERING (LOCALSTORAGE)
+// ==========================================
+
+// --------------------------------------
+// 2A. LÄS IN OCH SPARA ALLA MARKÖRER
+// --------------------------------------
 export function getLocalMarkers() {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -18,9 +26,6 @@ export function getLocalMarkers() {
   }
 }
 
-// -----------------------------------------------------------------
-// Sparar alla markörer till localStorage.
-// -----------------------------------------------------------------
 export function updateLocalMarkers(markers) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(markers));
@@ -29,9 +34,9 @@ export function updateLocalMarkers(markers) {
   }
 }
 
-// -----------------------------------------------------------------
-// Sparar eller uppdaterar en markör lokalt.
-// -----------------------------------------------------------------
+// --------------------------------------
+// 2B. HANTERA ENSKILDA MARKÖRER
+// --------------------------------------
 export function saveMarkerLocally(markerData) {
   const markers = getLocalMarkers();
   const markerId = markerData.id || `m_${Date.now()}`;
@@ -54,9 +59,6 @@ export function saveMarkerLocally(markerData) {
   return newMarker;
 }
 
-// -----------------------------------------------------------------
-// Markerar en specifik markör som synkad mot servern.
-// -----------------------------------------------------------------
 export function markAsSynced(markerId) {
   const markers = getLocalMarkers();
   const index = markers.findIndex(m => String(m.id) === String(markerId));
@@ -67,23 +69,24 @@ export function markAsSynced(markerId) {
   }
 }
 
-// -----------------------------------------------------------------
-// Tar bort en specifik markör från localStorage.
-// -----------------------------------------------------------------
 export function removeLocalMarker(markerId) {
   const markers = getLocalMarkers();
   const filtered = markers.filter(m => String(m.id) !== String(markerId));
   updateLocalMarkers(filtered);
 }
 
-// -----------------------------------------------------------------
-// Komprimerar bilder från kameran/galleriet direkt i klienten.
-// -----------------------------------------------------------------
+// ==========================================
+// 3. BILDKOMPRIMERING OCH CANVAS-HANTERING
+// ==========================================
+
+// --------------------------------------
+// 3A. BILDBEARBETNING OCH FALLBACKS
+// --------------------------------------
 export async function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
   if (!file) return null;
 
   try {
-    // 1. Försök använda createImageBitmap med EXIF-orientering (moderna webbläsare/mobiler)
+    // Försök använda createImageBitmap med EXIF-orientering (moderna webbläsare/mobiler)
     if ('createImageBitmap' in window) {
       const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
       return processImageToCanvas(bitmap, bitmap.width, bitmap.height, maxWidth, maxHeight, quality);
@@ -92,7 +95,7 @@ export async function compressImage(file, maxWidth = 800, maxHeight = 800, quali
     // Fallback till FileReader om createImageBitmap misslyckas
   }
 
-  // 2. Fallback med FileReader
+  // Fallback med FileReader
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -109,9 +112,9 @@ export async function compressImage(file, maxWidth = 800, maxHeight = 800, quali
   });
 }
 
-// -----------------------------------------------------------------
-// Hjälpfunktion för att rita upp och skala om bilden på en Canvas.
-// -----------------------------------------------------------------
+// --------------------------------------
+// 3B. CANVAS-RITNING OCH MINNESRENSNING
+// --------------------------------------
 function processImageToCanvas(source, sourceWidth, sourceHeight, maxWidth, maxHeight, quality) {
   let width = sourceWidth;
   let height = sourceHeight;

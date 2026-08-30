@@ -1,3 +1,12 @@
+//
+// filename: sw.js
+// Service Worker för offline-stöd, resurs-caching och livscykelhantering
+//
+
+// ==========================================
+// 1. GLOBALA KONSTANTER OCH ASSETS
+// ==========================================
+
 const CACHE_NAME = 'skogsmarkoren-v1';
 const ASSETS = [
   './',
@@ -9,7 +18,13 @@ const ASSETS = [
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
 
-// 1. Installera och cacha filer
+// ==========================================
+// 2. SERVICE WORKER LIVSCYKEL
+// ==========================================
+
+// --------------------------------------
+// 2A. INSTALLATION OCH CACHING
+// --------------------------------------
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
@@ -17,7 +32,9 @@ self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
 
-// 2. Rensa gamla cacher vid uppdatering
+// --------------------------------------
+// 2B. AKTIVERING OCH RENSNING AV GAMMAL CACHE
+// --------------------------------------
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => {
@@ -33,7 +50,13 @@ self.addEventListener('activate', (e) => {
   self.clients.claim();
 });
 
-// 3. Hämta från cache i första hand, sedan nätverket
+// ==========================================
+// 3. NÄTVERKS- OCH CACHE-HANTERING (FETCH)
+// ==========================================
+
+// --------------------------------------
+// 3A. FETCH-STRATEGI (CACHE FIRST)
+// --------------------------------------
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((response) => response || fetch(e.request))

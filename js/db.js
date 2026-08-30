@@ -5,15 +5,19 @@
 
 import { SCRIPT_URL } from './config.js';
 
+// ==========================================
+// 1. GLOBALA KONSTANTER OCH INITIALISERING
+// ==========================================
+
 const DB_NAME = 'ForestMapDB';
 const DB_VERSION = 2;
 const STORE_NAME = 'markers';
 
 let db = null;
 
-// -----------------------------------------------------------------
-// Initierar IndexedDB-databasen och skapar ObjectStore vid behov.
-// -----------------------------------------------------------------
+// --------------------------------------
+// 1A. DATABASINITIALISERING (INDEXEDDB)
+// --------------------------------------
 export function initDB() {
   return new Promise((resolve, reject) => {
     if (db) {
@@ -42,9 +46,29 @@ export function initDB() {
   });
 }
 
-// -----------------------------------------------------------------
-// Sparar eller uppdaterar en markör i IndexedDB.
-// -----------------------------------------------------------------
+// ==========================================
+// 2. LOKAL DATABASHANTERING (CRUD)
+// ==========================================
+
+// --------------------------------------
+// 2A. HÄMTA MARKÖRER
+// --------------------------------------
+export async function getAllMarkers() {
+  const dbInstance = await initDB();
+
+  return new Promise((resolve, reject) => {
+    const tx = dbInstance.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+// --------------------------------------
+// 2B. SPARA OCH RADERA MARKÖRER
+// --------------------------------------
 export async function saveMarker(place) {
   const dbInstance = await initDB();
 
@@ -68,25 +92,6 @@ export async function saveMarker(place) {
   });
 }
 
-// -----------------------------------------------------------------
-// Hämtar alla sparade markörer från IndexedDB.
-// -----------------------------------------------------------------
-export async function getAllMarkers() {
-  const dbInstance = await initDB();
-
-  return new Promise((resolve, reject) => {
-    const tx = dbInstance.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.getAll();
-
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = (e) => reject(e.target.error);
-  });
-}
-
-// -----------------------------------------------------------------
-// Tar bort en markör från IndexedDB baserat på ID.
-// -----------------------------------------------------------------
 export async function deleteMarker(id) {
   const dbInstance = await initDB();
 
@@ -100,9 +105,13 @@ export async function deleteMarker(id) {
   });
 }
 
-// -----------------------------------------------------------------
-// Synkroniserar alla väntande (pending) markörer till servern.
-// -----------------------------------------------------------------
+// ==========================================
+// 3. BAKGRUNDSSYNKRONISERING
+// ==========================================
+
+// --------------------------------------
+// 3A. ORKESTRERA VÄNTANDE SYNK
+// --------------------------------------
 export async function syncPendingMarkers() {
   if (!navigator.onLine) return;
   const places = await getAllMarkers();
@@ -113,9 +122,9 @@ export async function syncPendingMarkers() {
   }
 }
 
-// -----------------------------------------------------------------
-// Hjälpfunktion för att skicka en enskild markör till Google Sheets.
-// -----------------------------------------------------------------
+// --------------------------------------
+// 3B. SKICKA ENSKILD MARKÖR TILL SERVER
+// --------------------------------------
 async function syncSingleMarker(place) {
   try {
     const payload = {

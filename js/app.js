@@ -1,5 +1,6 @@
 //
 // filename: app.js
+// Huvudlogik för kartapplikationen, gränssnitt, GPS och markörhantering
 //
 
 import { SCRIPT_URL, CATEGORIES } from './config.js';
@@ -11,9 +12,13 @@ import { exportToGPX, exportToJSON, importFromJSON } from './exporter.js';
 // Initiera synk-lyssnaren direkt vid appstart
 try { initAutoSync(); } catch (e) { console.warn(e); }
 
-// -----------------------------------------------------------------
-// Appens Tillstånd (Global State)
-// -----------------------------------------------------------------
+// ==========================================
+// 1. GLOBAL TILLSTÅNDS- OCH VARIABELHANTERING
+// ==========================================
+
+// --------------------------------------
+// 1A. DEFAULT-KATEGORI OCH STATE-OBJETK
+// --------------------------------------
 const DEFAULT_CATEGORY = { id: 'default', name: 'Skogsfynd', group: 'Övrigt', iconSvg: '📍' };
 
 const state = {
@@ -34,14 +39,20 @@ const state = {
 
 state.selectedCategory = state.categories[0];
 
-// Leaflet-element
+// --------------------------------------
+// 1B. LEAFLET-ELEMENT (GLOBAL SIGHT)
+// --------------------------------------
 let userPositionMarker = null;
 let userAccuracyCircle = null;
 let navigationLine = null;
 
-// -----------------------------------------------------------------
-// Kartinitiering
-// -----------------------------------------------------------------
+// ==========================================
+// 2. KARTINITIERING OCH LAGERHANTERING
+// ==========================================
+
+// --------------------------------------
+// 2A. INSTÄLLNING AV KARTA OCH KUSTER
+// --------------------------------------
 const map = L.map('map', { 
     zoomControl: false, 
     maxZoom: 18 
@@ -56,9 +67,9 @@ map.addLayer(markerClusterGroup);
 setTimeout(() => map.invalidateSize(), 100);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// -----------------------------------------------------------------
-// Kartlager & Kartväljare
-// -----------------------------------------------------------------
+// --------------------------------------
+// 2B. KARTLAGER OG KARTVÄLJARE
+// --------------------------------------
 const tileLayers = {
     topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
@@ -117,15 +128,22 @@ function initMapSelector() {
     });
 }
 
-// -----------------------------------------------------------------
-// Initiering vid DOMContentLoaded
-// -----------------------------------------------------------------
+// ==========================================
+// 3. APPLIKATIONSSTART OCH DATA-LADDNING
+// ==========================================
+
+// --------------------------------------
+// 3A. DOMCONTENTLOADED LYSSNARE
+// --------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     initMapSelector();
     initEventListeners();
     loadInitialData();
 });
 
+// --------------------------------------
+// 3B. LÄS IN INITIAL DATA (LOCAL & REMOTE)
+// --------------------------------------
 function loadInitialData() {
     try {
         state.savedPlaces = [];
@@ -191,6 +209,9 @@ function loadInitialData() {
     }
 }
 
+// --------------------------------------
+// 3C. UPPFRÄSCHNING AV GRÄNSSNITTET (UI)
+// --------------------------------------
 function refreshUI() {
     updateMarkerCount();
     renderListView();
@@ -198,9 +219,10 @@ function refreshUI() {
     updateMapFilterBadge();
 }
 
-// -----------------------------------------------------------------
-// Händelselyssnare (Events)
-// -----------------------------------------------------------------
+// ==========================================
+// 4. HÄNDELSELYSSNARE (EVENT LISTENERS)
+// ==========================================
+
 function initEventListeners() {
     // Sortering
     const btnSortNewest = document.getElementById('sort-newest');
@@ -351,13 +373,20 @@ function initEventListeners() {
     });
 }
 
-// -----------------------------------------------------------------
-// Modal & Sparfunktioner
-// -----------------------------------------------------------------
+// ==========================================
+// 5. MODAL- OCH SPARFUNKTIONER
+// ==========================================
+
+// --------------------------------------
+// 5A. STÄNG MODAL
+// --------------------------------------
 function closeModal() {
     document.getElementById('save-modal')?.classList.add('hidden');
 }
 
+// --------------------------------------
+// 5B. SPARA MARKÖR HÄNDELSE
+// --------------------------------------
 async function handleSaveMarker(e) {
     e.preventDefault();
 
@@ -419,6 +448,9 @@ async function handleSaveMarker(e) {
     }
 }
 
+// --------------------------------------
+// 5C. RENDERA KATEGORIRUTNÄT I MODAL
+// --------------------------------------
 function renderCategoryGrid() {
     const grid = document.getElementById('category-grid');
     if (!grid) return;
@@ -446,9 +478,13 @@ function renderCategoryGrid() {
     });
 }
 
-// -----------------------------------------------------------------
-// Kartmarkörer & Popups
-// -----------------------------------------------------------------
+// ==========================================
+// 6. KARTMARKÖRER OCH POPUPS
+// ==========================================
+
+// --------------------------------------
+// 6A. IKON OCH POPUP-MALLAR
+// --------------------------------------
 function getCategoryIcon(place) {
     const title = (place.title || '').toLowerCase().trim();
     const category = (place.category || place.categoryGroup || '').toLowerCase().trim();
@@ -512,6 +548,9 @@ function createPopupContent(place) {
   `;
 }
 
+// --------------------------------------
+// 6B. LÄGG TILL OCH FOKUSERA MARKÖRER
+// --------------------------------------
 function addPlaceToMap(place) {
     if (state.markersMap[place.id]) {
         map.removeLayer(state.markersMap[place.id]);
@@ -571,9 +610,13 @@ function focusMarkerOnMap(id) {
 }
 window.focusMarkerOnMap = focusMarkerOnMap;
 
-// -----------------------------------------------------------------
-// GPS-spårning & Kompass
-// -----------------------------------------------------------------
+// ==========================================
+// 7. GPS-SPÅRNING OCH KOMPASS (ORIENTATION)
+// ==========================================
+
+// --------------------------------------
+// 7A. ANVÄNDARPOSITION-IKON OG SPÅRNING
+// --------------------------------------
 const myLocationIcon = L.divIcon({
     className: 'my-location-marker',
     html: `
@@ -644,6 +687,9 @@ if ('geolocation' in navigator) {
     );
 }
 
+// --------------------------------------
+// 7B. ENHETENS KOMPASS OG ORIENTERING
+// --------------------------------------
 function getAbsoluteHeading(event) {
     if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
         return event.webkitCompassHeading;
@@ -691,9 +737,13 @@ if (window.DeviceOrientationEvent) {
     }
 }
 
-// -----------------------------------------------------------------
-// Filtering, Sök & Listvy
-// -----------------------------------------------------------------
+// ==========================================
+// 8. FILTRERING, SÖK OCH LISTVY
+// ==========================================
+
+// --------------------------------------
+// 8A. AVSTÅNDSBERÄKNING OG RÄKNARE
+// --------------------------------------
 function calculateDistance(lat1, lon1, lat2, lon2) {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
     const R = 6371;
@@ -725,6 +775,9 @@ function updateMarkerCount() {
     });
 }
 
+// --------------------------------------
+// 8B. SÖK OCH KATEGORIFILTER
+// --------------------------------------
 function applyCategoryFilter(category) {
     state.activeCategoryFilter = category;
 
@@ -854,6 +907,9 @@ function updateMapFilterBadge() {
     }
 }
 
+// --------------------------------------
+// 8C. RENDERA LISTVY OG FILTER CHIPS
+// --------------------------------------
 function renderListView() {
     const container = document.getElementById('list-container');
     if (!container) return;
@@ -983,9 +1039,13 @@ function updateTabStyles(activeBtn, inactiveBtn) {
     inactiveBtn.style.fontWeight = '500';
 }
 
-// -----------------------------------------------------------------
-// Importera / Radera / Rutter
-// -----------------------------------------------------------------
+// ==========================================
+// 9. IMPORT/EXPORT, RADERA OCH NAVIGATION
+// ==========================================
+
+// --------------------------------------
+// 9A. JSON IMPORT
+// --------------------------------------
 function handleImportJSON(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -1015,6 +1075,9 @@ function handleImportJSON(e) {
     });
 }
 
+// --------------------------------------
+// 9B. BEKRÄFTELSEDALOG OG RADERA MARKÖR
+// --------------------------------------
 function showConfirm(message, title = "Ta bort markör") {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirm-modal');
@@ -1081,6 +1144,9 @@ window.removeCurrentMarker = async function(id) {
     }
 };
 
+// --------------------------------------
+// 9C. RUTTRITNING OG EXTERNA KARTOR
+// --------------------------------------
 function toggleRouteTo(id, destLat, destLng) {
     if (state.targetMarkerId === String(id)) {
         stopRouteTo();
@@ -1129,7 +1195,9 @@ window.drawRouteTo = drawRouteTo;
 window.stopRouteTo = stopRouteTo;
 window.openExternalMap = openExternalMap;
 
-// Registrera Service Worker för PWA-stöd
+// ==========================================
+// 10. SERVICE WORKER REGISTRERING (PWA)
+// ==========================================
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
 }

@@ -3,15 +3,23 @@
 // Inställningar och kategoridefinitioner för kartapplikationen
 //
 
+// ==========================================
+// 1. GLOBALA KONSTANTER OCH INITIALISERING
+// ==========================================
+
 export const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw0utLhV6H8G0FbGdwIiM7Jk8L4u1QcXtpgiJLkQL5pFccAa-RTol-tRvl4_Oco_x1XeQ/exec';
 
 // Hjälpfunktion för att generera enhetliga SVG-ikoner
 const createSvg = (content) => `<svg viewBox="0 0 36 36" class="w-7 h-7">${content}</svg>`;
 
+// ==========================================
+// 2. KATEGORIDEFINITIONER
+// ==========================================
+
 export const CATEGORIES = Object.freeze([
-  // -----------------------------------------------------------------
-  // SVAMP
-  // -----------------------------------------------------------------
+  // --------------------------------------
+  // 2A. SVAMP
+  // --------------------------------------
   {
     id: 'gula-kantareller',
     name: 'Gula kantareller',
@@ -51,9 +59,9 @@ export const CATEGORIES = Object.freeze([
     `)
   },
 
-  // -----------------------------------------------------------------
-  // BÄR
-  // -----------------------------------------------------------------
+  // --------------------------------------
+  // 2B. BÄR
+  // --------------------------------------
   {
     id: 'blabar',
     name: 'Blåbär',
@@ -125,9 +133,9 @@ export const CATEGORIES = Object.freeze([
     `)
   },
 
-  // -----------------------------------------------------------------
-  // NATUR & FRILUFTSLIV
-  // -----------------------------------------------------------------
+  // --------------------------------------
+  // 2C. NATUR & FRILUFTSLIV
+  // --------------------------------------
   {
     id: 'fiske',
     name: 'Fiskeplats',
@@ -189,9 +197,10 @@ export const CATEGORIES = Object.freeze([
   }
 ]);
 
-// -----------------------------------------------------------------
-// Hjälpfunktioner
-// -----------------------------------------------------------------
+// ==========================================
+// 3. HJÄLPFUNKTIONER
+// ==========================================
+
 export function getCategoryById(id) {
   return CATEGORIES.find(cat => cat.id === id) || null;
 }

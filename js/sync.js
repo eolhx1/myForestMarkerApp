@@ -1,14 +1,18 @@
 //
-// filename: js/sync.js
+// filename: sync.js
 // Logik för automatisk synkronisering mot Google Sheets (Google Apps Script)
 //
 
 import { SCRIPT_URL } from './config.js';
 import { getLocalMarkers, markAsSynced } from './storage.js';
 
-// -----------------------------------------------------------------
-// Initierar automatisk synkronisering vid nätverksändringar.
-// -----------------------------------------------------------------
+// ==========================================
+// 1. INITIALISERING OCH HUVUDSTRÖM
+// ==========================================
+
+// --------------------------------------
+// 1A. LYSSNA PÅ NÄTVERKSSTATUS
+// --------------------------------------
 export function initAutoSync() {
   // Lyssna på när enheten får tillbaka täckning
   window.addEventListener('online', () => {
@@ -22,9 +26,9 @@ export function initAutoSync() {
   }
 }
 
-// -----------------------------------------------------------------
-// Synkroniserar både väntande raderingar och nya/ändrade markörer.
-// -----------------------------------------------------------------
+// --------------------------------------
+// 1B. ORKESTRERING AV SYNKRONISERING
+// --------------------------------------
 export async function syncPendingMarkers() {
   if (!navigator.onLine) return;
 
@@ -35,9 +39,13 @@ export async function syncPendingMarkers() {
   await syncUnsyncedMarkers();
 }
 
-// -----------------------------------------------------------------
-// Hjälpfunktion för att hantera raderingar som gjorts offline.
-// -----------------------------------------------------------------
+// ==========================================
+// 2. HJÄLPFUNKTIONER FÖR SYNKRONISERING
+// ==========================================
+
+// --------------------------------------
+// 2A. HANTERA OFFLINE-RADERINGAR
+// --------------------------------------
 async function syncPendingDeletes() {
   try {
     const pendingDeletes = JSON.parse(localStorage.getItem('pendingDeletes') || '[]');
@@ -69,9 +77,9 @@ async function syncPendingDeletes() {
   }
 }
 
-// -----------------------------------------------------------------
-// Hjälpfunktion för att skicka nya/ändrade markörer till servern.
-// -----------------------------------------------------------------
+// --------------------------------------
+// 2B. HANTERA SKICKNING AV MARKÖRER
+// --------------------------------------
 async function syncUnsyncedMarkers() {
   if (!SCRIPT_URL) return;
 

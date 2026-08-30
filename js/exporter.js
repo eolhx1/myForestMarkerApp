@@ -1,10 +1,15 @@
 //
-// filename: exporter.js 
+// filename: js/exporter.js
+// Logik för dataexport (GPX/JSON) samt import av sparade markörer
 //
-// Funktion för att;
-// - exportera all data till en .gpx-fil
-// - exportera all data till en .JSON-fil
 
+// ==========================================
+// 1. EXPORT- OCH IMPORT-FUNKTIONER
+// ==========================================
+
+// --------------------------------------
+// 1A. EXPORTERA TILL GPX-FORMAT
+// --------------------------------------
 export function exportToGPX(markers = []) {
   if (!markers || markers.length === 0) {
     alert('Det finns inga sparade platser att exportera.');
@@ -49,6 +54,58 @@ export function exportToGPX(markers = []) {
   URL.revokeObjectURL(url);
 }
 
+// --------------------------------------
+// 1B. EXPORTERA TILL JSON-FORMAT
+// --------------------------------------
+export function exportToJSON(places) {
+  if (!places || places.length === 0) {
+    alert("Det finns inga sparade platser att exportera.");
+    return;
+  }
+
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(places, null, 2));
+  const downloadAnchor = document.createElement('a');
+  const filename = `skogsmarkoren_backup_${new Date().toISOString().slice(0, 10)}.json`;
+
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", filename);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+}
+
+// --------------------------------------
+// 1C. IMPORTERA FRÅN JSON-FIL
+// --------------------------------------
+export function importFromJSON(file, onComplete) {
+  const reader = new FileReader();
+
+  reader.onload = function(event) {
+    try {
+      const importedData = JSON.parse(event.target.result);
+
+      if (!Array.isArray(importedData)) {
+        alert("Felaktigt filformat. Filen måste innehålla en lista med platser.");
+        return;
+      }
+
+      if (onComplete) onComplete(importedData);
+    } catch (err) {
+      alert("Kunde inte läsa filen. Se till att det är en giltig JSON-fil.");
+      console.error(err);
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+// ==========================================
+// 2. HJÄLPFUNKTIONER
+// ==========================================
+
+// --------------------------------------
+// 2A. XML-SANITERING
+// --------------------------------------
 function escapeXml(unsafe) {
   if (!unsafe) return '';
   return String(unsafe).replace(/[<>&'"]/g, (c) => {
@@ -62,45 +119,3 @@ function escapeXml(unsafe) {
     }
   });
 }
-
-// Exportera all data till en JSON-fil
-export function exportToJSON(places) {
-    if (!places || places.length === 0) {
-        alert("Det finns inga sparade platser att exportera.");
-        return;
-    }
-
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(places, null, 2));
-    const downloadAnchor = document.createElement('a');
-    const filename = `skogsmarkoren_backup_${new Date().toISOString().slice(0, 10)}.json`;
-
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", filename);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-}
-
-// Importera data från en vald JSON-fil
-export function importFromJSON(file, onComplete) {
-    const reader = new FileReader();
-
-    reader.onload = function(event) {
-        try {
-            const importedData = JSON.parse(event.target.result);
-
-            if (!Array.isArray(importedData)) {
-                alert("Felaktigt filformat. Filen måste innehålla en lista med platser.");
-                return;
-            }
-
-            if (onComplete) onComplete(importedData);
-        } catch (err) {
-            alert("Kunde inte läsa filen. Se till att det är en giltig JSON-fil.");
-            console.error(err);
-        }
-    };
-
-    reader.readAsText(file);
-}
-
