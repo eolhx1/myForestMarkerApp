@@ -597,15 +597,33 @@ function focusMarkerOnMap(id) {
     const place = state.savedPlaces.find(p => String(p.id) === String(id));
     if (!place) return;
 
+    // Återställ eventuellt aktiva filter så att markören garanterat syns på kartan
+    if (state.activeCategoryFilter !== 'all' || state.searchQuery !== '') {
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = '';
+        applySearchFilter();
+        applyCategoryFilter('all');
+        updateMapFilterBadge();
+    }
+
+    // Växla till kartvy
     document.getElementById('list-view')?.classList.add('hidden');
     document.getElementById('map-view')?.classList.remove('hidden');
     updateTabStyles(document.getElementById('btn-show-map'), document.getElementById('btn-show-list'));
     
     map.invalidateSize();
-    map.flyTo([Number(place.lat), Number(place.lng)], 17, { animate: true });
 
-    if (state.markersMap[id]) {
-        state.markersMap[id].openPopup();
+    const marker = state.markersMap[id];
+    const targetLatLng = [Number(place.lat), Number(place.lng)];
+
+    if (marker) {
+        // Om markören ligger i ett kluster ser vi till att klustret fälls ut
+        markerClusterGroup.zoomToShowLayer(marker, () => {
+            map.flyTo(targetLatLng, 17, { animate: true, duration: 1.2 });
+            marker.openPopup();
+        });
+    } else {
+        map.flyTo(targetLatLng, 17, { animate: true, duration: 1.2 });
     }
 }
 window.focusMarkerOnMap = focusMarkerOnMap;
