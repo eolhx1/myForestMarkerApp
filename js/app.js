@@ -1,6 +1,6 @@
 //
 // filename: app.js
-// Huvudlogik för kartapplikationen, gränssnitt, GPS och markörhantering
+// Huvudlogik för kartapplikationen, gränssnitt, GPS och markörhantering (med Redigeringsfunktion)
 //
 
 import { SCRIPT_URL, CATEGORIES } from './config.js';
@@ -16,9 +16,6 @@ try { initAutoSync(); } catch (e) { console.warn(e); }
 // 1. GLOBAL TILLSTÅNDS- OCH VARIABELHANTERING
 // ==========================================
 
-// --------------------------------------
-// 1A. DEFAULT-KATEGORI OCH STATE-OBJETK
-// --------------------------------------
 const DEFAULT_CATEGORY = { id: 'default', name: 'Skogsfynd', group: 'Övrigt', iconSvg: '📍' };
 
 const state = {
@@ -34,7 +31,8 @@ const state = {
     currentSortMode: 'newest', 
     currentHeading: 0,
     hasReceivedAbsolute: false,
-    targetMarkerId: null
+    targetMarkerId: null,
+    editingMarkerId: null // Ny variabel för att hålla koll på om vi redigerar en befintlig markör
 };
 
 state.selectedCategory = state.categories[0];
@@ -50,9 +48,6 @@ let navigationLine = null;
 // 2. KARTINITIERING OCH LAGERHANTERING
 // ==========================================
 
-// --------------------------------------
-// 2A. INSTÄLLNING AV KARTA OCH KUSTER
-// --------------------------------------
 const map = L.map('map', { 
     zoomControl: false, 
     maxZoom: 18 
@@ -67,9 +62,6 @@ map.addLayer(markerClusterGroup);
 setTimeout(() => map.invalidateSize(), 100);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// --------------------------------------
-// 2B. KARTLAGER OG KARTVÄLJARE
-// --------------------------------------
 const tileLayers = {
     topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         maxZoom: 17,
@@ -132,30 +124,22 @@ function initMapSelector() {
 // 3. APPLIKATIONSSTART OCH DATA-LADDNING
 // ==========================================
 
-// --------------------------------------
-// 3A. DOMCONTENTLOADED LYSSNARE
-// --------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     initMapSelector();
     initEventListeners();
     loadInitialData();
 });
 
-// --------------------------------------
-// 3B. LÄS IN INITIAL DATA (LOCAL & REMOTE)
-// --------------------------------------
 function loadInitialData() {
     try {
         state.savedPlaces = [];
 
-        // 1. Hämta lokalt först för snabb visning
         const stored = getLocalMarkers();
         if (stored && stored.length > 0) {
             state.savedPlaces = stored.map(place => ({ ...place, id: String(place.id) }));
             state.savedPlaces.forEach(place => addPlaceToMap(place));
         }
 
-        // 2. Hämta från Google Sheets om online
         if (navigator.onLine) {
             fetch(SCRIPT_URL)
                 .then(res => res.json())
@@ -186,6 +170,8 @@ function loadInitialData() {
                                 categoryGroup: item.category || item.Category || 'Övrigt',
                                 category: item.category || item.Category || 'Övrigt',
                                 description: item.description || item.Description || '',
+                                amount: item.amount || '',
+                                notes: item.notes || item.description || '',
                                 photo: item.photo || item.Photo || item.photoUrl || null,
                                 timestamp: item.timestamp || item.Timestamp || '',
                                 synced: true
@@ -209,9 +195,6 @@ function loadInitialData() {
     }
 }
 
-// --------------------------------------
-// 3C. UPPFRÄSCHNING AV GRÄNSSNITTET (UI)
-// --------------------------------------
 function refreshUI() {
     updateMarkerCount();
     renderListView();
@@ -224,7 +207,6 @@ function refreshUI() {
 // ==========================================
 
 function initEventListeners() {
-    // Sortering
     const btnSortNewest = document.getElementById('sort-newest');
     const btnSortDistance = document.getElementById('sort-distance');
 
@@ -250,7 +232,6 @@ function initEventListeners() {
         renderListView();
     });
 
-    // Flikväxling
     const btnList = document.getElementById('btn-show-list');
     const btnMap = document.getElementById('btn-show-map');
 
@@ -269,7 +250,6 @@ function initEventListeners() {
         setTimeout(() => map.invalidateSize(), 100);
     });
 
-    // Sökning
     const searchInput = document.getElementById('search-input');
     searchInput?.addEventListener('input', () => {
         applySearchFilter();
@@ -299,15 +279,26 @@ function initEventListeners() {
         updateMapFilterBadge();
     });
 
-    // Modal & Skapa markör
+    // Skapa ny markör (återställer redigeringsläget)
     document.getElementById('btn-mark')?.addEventListener('click', () => {
         if (state.currentCoords) {
+            state.editingMarkerId = null; // Återställ till ny markör
+
+            const modalTitle = document.getElementById('modal-main-title');
+            if (modalTitle) modalTitle.innerText = 'Spara plats';
+
             const coordsEl = document.getElementById('modal-coords');
             if (coordsEl) coordsEl.innerText = `${state.currentCoords[0].toFixed(6)}, ${state.currentCoords[1].toFixed(6)}`;
 
             if (!state.selectedCategory) state.selectedCategory = state.categories[0];
             const titleInput = document.getElementById('input-title');
             if (titleInput) titleInput.value = state.selectedCategory.name;
+
+            const notesInput = document.getElementById('input-notes');
+            if (notesInput) notesInput.value = '';
+
+            state.currentPhotoBase64 = null;
+            document.getElementById('photo-preview-container')?.classList.add('hidden');
 
             renderCategoryGrid();
             document.getElementById('save-modal')?.classList.remove('hidden');
@@ -319,7 +310,6 @@ function initEventListeners() {
     document.getElementById('modal-close')?.addEventListener('click', closeModal);
     document.getElementById('btn-save-confirm')?.addEventListener('click', handleSaveMarker);
 
-    // Bildhantering
     document.getElementById('input-photo')?.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -338,20 +328,13 @@ function initEventListeners() {
         }
     });
 
-    // Mängdknappar
     document.querySelectorAll('.amount-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             state.selectedAmount = e.currentTarget.getAttribute('data-amount');
-            document.querySelectorAll('.amount-btn').forEach(b => {
-                b.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
-                b.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
-            });
-            e.currentTarget.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
-            e.currentTarget.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+            updateAmountButtonsUI();
         });
     });
 
-    // Exportera / Importera / Hamburgare
     const btnHamburger = document.getElementById('btn-hamburger');
     const hamburgerMenu = document.getElementById('hamburger-menu');
 
@@ -367,33 +350,81 @@ function initEventListeners() {
     document.getElementById('btn-export-json')?.addEventListener('click', () => exportToJSON(state.savedPlaces));
     document.getElementById('input-import-json')?.addEventListener('change', handleImportJSON);
 
-    // GPS Centrera
     document.getElementById('btn-recenter')?.addEventListener('click', () => {
         if (state.currentCoords) map.flyTo(state.currentCoords, 16, { animate: true, duration: 1.5 });
     });
 }
 
+function updateAmountButtonsUI() {
+    document.querySelectorAll('.amount-btn').forEach(b => {
+        const amountVal = b.getAttribute('data-amount');
+        if (amountVal === state.selectedAmount) {
+            b.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
+            b.classList.add('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+        } else {
+            b.classList.remove('border-emerald-600', 'bg-emerald-50', 'text-emerald-800', 'font-bold');
+            b.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
+        }
+    });
+}
+
 // ==========================================
-// 5. MODAL- OCH SPARFUNKTIONER
+// 5. MODAL- OCH SPAR/REDIGERINGSFUNKTIONER
 // ==========================================
 
-// --------------------------------------
-// 5A. STÄNG MODAL
-// --------------------------------------
 function closeModal() {
+    state.editingMarkerId = null;
     document.getElementById('save-modal')?.classList.add('hidden');
 }
 
-// --------------------------------------
-// 5B. SPARA MARKÖR HÄNDELSE
-// --------------------------------------
+// Öppna modalen för redigering av en befintlig markör
+function openEditModal(id) {
+    const place = state.savedPlaces.find(p => String(p.id) === String(id));
+    if (!place) return;
+
+    state.editingMarkerId = String(id);
+
+    const modalTitle = document.getElementById('modal-main-title');
+    if (modalTitle) modalTitle.innerText = 'Redigera plats';
+
+    const coordsEl = document.getElementById('modal-coords');
+    if (coordsEl) coordsEl.innerText = `${Number(place.lat).toFixed(6)}, ${Number(place.lng).toFixed(6)}`;
+
+    const titleInput = document.getElementById('input-title');
+    if (titleInput) titleInput.value = place.title || '';
+
+    const notesInput = document.getElementById('input-notes');
+    if (notesInput) notesInput.value = place.notes || place.description || '';
+
+    const catName = place.category || place.categoryGroup || '';
+    const matchedCategory = state.categories.find(c => c.name === catName || c.group === catName) || state.categories[0];
+    state.selectedCategory = matchedCategory;
+
+    if (place.amount) {
+        state.selectedAmount = place.amount;
+        updateAmountButtonsUI();
+    }
+
+    if (place.photo) {
+        state.currentPhotoBase64 = place.photo;
+        const preview = document.getElementById('photo-preview');
+        const previewContainer = document.getElementById('photo-preview-container');
+        if (preview && previewContainer) {
+            preview.src = place.photo;
+            previewContainer.classList.remove('hidden');
+        }
+    } else {
+        state.currentPhotoBase64 = null;
+        document.getElementById('photo-preview-container')?.classList.add('hidden');
+    }
+
+    renderCategoryGrid();
+    document.getElementById('save-modal')?.classList.remove('hidden');
+}
+window.openEditModal = openEditModal;
+
 async function handleSaveMarker(e) {
     e.preventDefault();
-
-    if (!state.currentCoords) {
-        alert("GPS-position saknas.");
-        return;
-    }
 
     try {
         const title = document.getElementById('input-title')?.value || state.selectedCategory?.name || 'Skogsfynd';
@@ -405,6 +436,46 @@ async function handleSaveMarker(e) {
 
         if (photoInput?.files?.[0] && !photoBase64) {
             photoBase64 = await compressImage(photoInput.files[0]);
+        }
+
+        // REDIGERING AV BEFINTLIG MARKÖR
+        if (state.editingMarkerId) {
+            const index = state.savedPlaces.findIndex(p => String(p.id) === String(state.editingMarkerId));
+            if (index !== -1) {
+                const existing = state.savedPlaces[index];
+                const updatedMarkerData = {
+                    ...existing,
+                    title,
+                    categoryGroup: catGroup,
+                    category: catGroup,
+                    description: notes ? `${state.selectedAmount}. ${notes}` : state.selectedAmount,
+                    amount: state.selectedAmount,
+                    notes,
+                    photo: photoBase64 || existing.photo,
+                    synced: false,
+                    syncStatus: 'pending'
+                };
+
+                const savedMarker = saveMarkerLocally(updatedMarkerData);
+                state.savedPlaces[index] = savedMarker;
+                addPlaceToMap(savedMarker);
+
+                closeModal();
+                refreshUI();
+
+                if (state.markersMap[savedMarker.id]) {
+                    state.markersMap[savedMarker.id].openPopup();
+                }
+
+                try { syncPendingMarkers(); } catch(e){}
+                return;
+            }
+        }
+
+        // SKAPA NY MARKÖR
+        if (!state.currentCoords) {
+            alert("GPS-position saknas.");
+            return;
         }
 
         const newMarkerData = {
@@ -448,9 +519,6 @@ async function handleSaveMarker(e) {
     }
 }
 
-// --------------------------------------
-// 5C. RENDERA KATEGORIRUTNÄT I MODAL
-// --------------------------------------
 function renderCategoryGrid() {
     const grid = document.getElementById('category-grid');
     if (!grid) return;
@@ -482,9 +550,6 @@ function renderCategoryGrid() {
 // 6. KARTMARKÖRER OCH POPUPS
 // ==========================================
 
-// --------------------------------------
-// 6A. IKON OCH POPUP-MALLAR
-// --------------------------------------
 function getCategoryIcon(place) {
     const title = (place.title || '').toLowerCase().trim();
     const category = (place.category || place.categoryGroup || '').toLowerCase().trim();
@@ -518,9 +583,14 @@ function createPopupContent(place) {
     <div style="min-width: 230px; width: 230px;" class="p-1">
       <div class="flex items-start justify-between gap-2 mb-1">
         <h3 class="font-bold text-slate-900 text-sm leading-snug">${titleText}</h3>
-        <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition flex-shrink-0" title="Ta bort">
-          🗑️
-        </button>
+        <div class="flex items-center gap-1 shrink-0">
+          <button onclick="window.openEditModal('${place.id}')" class="text-slate-400 hover:text-emerald-600 p-1 rounded-lg hover:bg-emerald-50 transition" title="Redigera">
+            ✏️
+          </button>
+          <button onclick="window.removeCurrentMarker('${place.id}')" class="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition" title="Ta bort">
+            🗑️
+          </button>
+        </div>
       </div>
 
       <span class="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-medium px-2.5 py-0.5 rounded-full mb-1">
@@ -548,12 +618,9 @@ function createPopupContent(place) {
   `;
 }
 
-// --------------------------------------
-// 6B. LÄGG TILL OCH FOKUSERA MARKÖRER
-// --------------------------------------
 function addPlaceToMap(place) {
     if (state.markersMap[place.id]) {
-        map.removeLayer(state.markersMap[place.id]);
+        markerClusterGroup.removeLayer(state.markersMap[place.id]);
     }
 
     const svgIconHtml = getCategoryIcon(place);
@@ -597,7 +664,6 @@ function focusMarkerOnMap(id) {
     const place = state.savedPlaces.find(p => String(p.id) === String(id));
     if (!place) return;
 
-    // Återställ eventuellt aktiva filter så att markören garanterat syns på kartan
     if (state.activeCategoryFilter !== 'all' || state.searchQuery !== '') {
         const searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.value = '';
@@ -606,7 +672,6 @@ function focusMarkerOnMap(id) {
         updateMapFilterBadge();
     }
 
-    // Växla till kartvy
     document.getElementById('list-view')?.classList.add('hidden');
     document.getElementById('map-view')?.classList.remove('hidden');
     updateTabStyles(document.getElementById('btn-show-map'), document.getElementById('btn-show-list'));
@@ -617,7 +682,6 @@ function focusMarkerOnMap(id) {
     const targetLatLng = [Number(place.lat), Number(place.lng)];
 
     if (marker) {
-        // Om markören ligger i ett kluster ser vi till att klustret fälls ut
         markerClusterGroup.zoomToShowLayer(marker, () => {
             map.flyTo(targetLatLng, 17, { animate: true, duration: 1.2 });
             marker.openPopup();
@@ -632,9 +696,6 @@ window.focusMarkerOnMap = focusMarkerOnMap;
 // 7. GPS-SPÅRNING OCH KOMPASS (ORIENTATION)
 // ==========================================
 
-// --------------------------------------
-// 7A. ANVÄNDARPOSITION-IKON OG SPÅRNING
-// --------------------------------------
 const myLocationIcon = L.divIcon({
     className: 'my-location-marker',
     html: `
@@ -705,9 +766,6 @@ if ('geolocation' in navigator) {
     );
 }
 
-// --------------------------------------
-// 7B. ENHETENS KOMPASS OG ORIENTERING
-// --------------------------------------
 function getAbsoluteHeading(event) {
     if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
         return event.webkitCompassHeading;
@@ -759,9 +817,6 @@ if (window.DeviceOrientationEvent) {
 // 8. FILTRERING, SÖK OCH LISTVY
 // ==========================================
 
-// --------------------------------------
-// 8A. AVSTÅNDSBERÄKNING OG RÄKNARE
-// --------------------------------------
 function calculateDistance(lat1, lon1, lat2, lon2) {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
     const R = 6371;
@@ -793,9 +848,6 @@ function updateMarkerCount() {
     });
 }
 
-// --------------------------------------
-// 8B. SÖK OCH KATEGORIFILTER
-// --------------------------------------
 function applyCategoryFilter(category) {
     state.activeCategoryFilter = category;
 
@@ -925,9 +977,6 @@ function updateMapFilterBadge() {
     }
 }
 
-// --------------------------------------
-// 8C. RENDERA LISTVY OG FILTER CHIPS
-// --------------------------------------
 function renderListView() {
     const container = document.getElementById('list-container');
     if (!container) return;
@@ -1061,9 +1110,6 @@ function updateTabStyles(activeBtn, inactiveBtn) {
 // 9. IMPORT/EXPORT, RADERA OCH NAVIGATION
 // ==========================================
 
-// --------------------------------------
-// 9A. JSON IMPORT
-// --------------------------------------
 function handleImportJSON(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -1093,9 +1139,6 @@ function handleImportJSON(e) {
     });
 }
 
-// --------------------------------------
-// 9B. BEKRÄFTELSEDALOG OG RADERA MARKÖR
-// --------------------------------------
 function showConfirm(message, title = "Ta bort markör") {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirm-modal');
@@ -1162,9 +1205,6 @@ window.removeCurrentMarker = async function(id) {
     }
 };
 
-// --------------------------------------
-// 9C. RUTTRITNING OG EXTERNA KARTOR
-// --------------------------------------
 function toggleRouteTo(id, destLat, destLng) {
     if (state.targetMarkerId === String(id)) {
         stopRouteTo();
@@ -1207,7 +1247,6 @@ function openExternalMap(lat, lng) {
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
 }
 
-// Globala funktioner för inline Event Handlers i Popups
 window.toggleRouteTo = toggleRouteTo;
 window.drawRouteTo = drawRouteTo;
 window.stopRouteTo = stopRouteTo;
