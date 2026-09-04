@@ -481,6 +481,10 @@ async function handleSaveMarker(e) {
             return;
         }
 
+        // Konvertera koordinaterna till strängar med komma
+        const latFormatted = state.currentCoords[0].toString().replace('.', ',');
+        const lngFormatted = state.currentCoords[1].toString().replace('.', ',');
+        
         const newMarkerData = {
             id: 'marker_' + Date.now(),
             title,
@@ -489,13 +493,14 @@ async function handleSaveMarker(e) {
             description: notes,
             amount: state.selectedAmount,
             notes: notes,
-            lat: state.currentCoords[0],
-            lng: state.currentCoords[1],
+            lat: latFormatted, // Skickas som "57,947766" istället för talet 57.947766
+            lng: lngFormatted, // Skickas som "13,018034" istället för talet 13.018034
             photo: photoBase64,
             timestamp: new Date().toISOString(),
             synced: false,
             syncStatus: 'pending'
         };
+
 
         const savedMarker = saveMarkerLocally(newMarkerData);
 
